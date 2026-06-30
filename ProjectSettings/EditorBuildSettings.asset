@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 1
+    path: Assets/_Project/Scenes/Boot.unity
+    guid: 270a6da357106ad4cac0a673a1e3e959
+  - enabled: 1
+    path: Assets/_Project/Scenes/Login.unity
+    guid: 35c77f7a44056be46a760b60fb8ff306
+  - enabled: 1
+    path: Assets/_Project/Scenes/MainMenu.unity
+    guid: 926ddae8296e28f43b16cee2bcccf5ca
+  - enabled: 1
+    path: Assets/_Project/Scenes/Game.unity
+    guid: a8257c83ae0793e4e93d859a9c7e7103
+  - enabled: 1
+    path: Assets/_Project/Scenes/CastleInterior.unity
+    guid: cd125ef84af2f0b43b30c4bc1922c1d3
+  - enabled: 1
+    path: Assets/_Project/Scenes/Game_Field.unity
+    guid: 27b9003e7c2192b44933c7b4d5b6862d
+  - enabled: 1
+    path: Assets/_Project/Scenes/HouseInterior.unity
+    guid: b35f3aa3a70dbe34f8ab2ab48413e687
+  - enabled: 1
+    path: Assets/_Project/Scenes/Game_Desert.unity
+    guid: f8e4cadcd601c2f4daa14413d2ff00b2
+  - enabled: 1
+    path: Assets/_Project/Scenes/TentInterior.unity
+    guid: 1c55e296b3922c642846390e9be42441
+  - enabled: 1
+    path: Assets/_Project/Scenes/Game_Snow.unity
+    guid: ff6fc61ecd4c8cd48a46f49911efc8f7
+  - enabled: 1
+    path: Assets/_Project/Scenes/CabinInterior.unity
+    guid: bd4cf167c0cfcf844a7ad0e72cb471e3
+  - enabled: 1
+    path: Assets/_Project/Scenes/Game_Lava.unity
+    guid: 33bd37e51ffaa8d4ba56132e228ae30a
+  m_configObjects:
+    com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
