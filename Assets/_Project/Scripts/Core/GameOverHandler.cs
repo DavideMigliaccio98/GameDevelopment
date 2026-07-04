@@ -44,7 +44,12 @@ public class GameOverHandler : MonoBehaviour
 
         // mostra il pannello
         if (gameOverPanel != null) gameOverPanel.SetActive(true);
-        if (scoreText != null) scoreText.text = $"Score: {score}";
+        if (scoreText != null)
+{
+    Debug.Log($"[GameOver] Aggiorno scoreText su GameObject: {scoreText.gameObject.name} (parent: {scoreText.transform.parent?.name})");
+    scoreText.text = $"Score: {score}";
+    Debug.Log($"[GameOver] scoreText.text dopo assegnazione = {scoreText.text}");
+}
 
         if (!PlayFabAuth.IsLoggedIn)
         {

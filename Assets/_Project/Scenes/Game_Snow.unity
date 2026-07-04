@@ -3722,7 +3722,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameOverHandler
   player: {fileID: 492128401}
   gameOverPanel: {fileID: 1263367364}
-  scoreText: {fileID: 109412447}
+  scoreText: {fileID: 546534916}
 --- !u!4 &1385169032
 Transform:
   m_ObjectHideFlags: 0
