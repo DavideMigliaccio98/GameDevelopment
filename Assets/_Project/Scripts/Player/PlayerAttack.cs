@@ -13,10 +13,36 @@ public class PlayerAttack : MonoBehaviour
     private PlayerController pc;
     private float lastAttackTime = -999f;
 
+    // >>> BOOST ATTACCO temporaneo
+    private int baseDamage;
+    private float boostEndTime = 0f;
+    public bool IsBoosted => boostEndTime > Time.time;
+
     private void Awake()
     {
         anim = GetComponentInChildren<Animator>();
         pc = GetComponent<PlayerController>();
+        baseDamage = damage; // salva il danno base
+    }
+
+    private void Update()
+    {
+        // Fine boost: ripristina danno normale
+        if (boostEndTime > 0f && Time.time >= boostEndTime)
+        {
+            damage = baseDamage;
+            boostEndTime = 0f;
+            Debug.Log("[Boost] Attacco tornato normale");
+        }
+    }
+
+    public void ApplyAttackBoost(float duration, float multiplier)
+    {
+        // se non gi� boostato, salva il danno base corrente
+        if (boostEndTime <= Time.time) baseDamage = damage;
+        damage = Mathf.RoundToInt(baseDamage * multiplier);
+        boostEndTime = Time.time + duration;
+        Debug.Log($"[Boost] Attacco potenziato! Danno={damage} per {duration}s");
     }
 
     public void TryAttack()
@@ -24,10 +50,9 @@ public class PlayerAttack : MonoBehaviour
         if (Time.time - lastAttackTime < cooldown) return;
         lastAttackTime = Time.time;
 
-        // >>> SFX attacco (anche a vuoto)
+        // SFX attacco (anche a vuoto)
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlaySwordAttack();
-        // <
 
         anim.SetTrigger("attack");
 
@@ -39,7 +64,6 @@ public class PlayerAttack : MonoBehaviour
             {
                 eh.TakeDamage(damage);
 
-                // spawna le particelle al colpo
                 if (hitParticlesPrefab != null)
                 {
                     Vector3 spawnPos = h.transform.position + Vector3.up * 0.5f;

@@ -17,9 +17,14 @@ public class NPC : MonoBehaviour
     [SerializeField] private int healCostScore = 50;
     [SerializeField] private bool healFullHP = true;
 
+    [Header("Potenzia Attacco")]
+    [SerializeField] private int boostCostScore = 80;
+    [SerializeField] private float boostDuration = 15f;
+    [SerializeField] private float boostMultiplier = 2f;
+
     [Header("Interazione")]
     [SerializeField] private float interactionRange = 2f;
-    [SerializeField] private GameObject interactPromptUI; // bottone "Parla"
+    [SerializeField] private GameObject interactPromptUI;
 
     private bool playerInRange = false;
     private Transform playerTransform;
@@ -28,6 +33,7 @@ public class NPC : MonoBehaviour
     public List<string> DialogLines => dialogLines;
     public int HealCost => healCostScore;
     public bool HealFull => healFullHP;
+    public int BoostCost => boostCostScore;
 
     private void Start()
     {
@@ -48,7 +54,6 @@ public class NPC : MonoBehaviour
             if (interactPromptUI != null) interactPromptUI.SetActive(playerInRange);
         }
 
-        // Su PC: tasto E per interagire
         if (playerInRange && Input.GetKeyDown(KeyCode.E))
         {
             OpenDialog();
@@ -67,7 +72,7 @@ public class NPC : MonoBehaviour
         if (GameManager.Instance == null) return;
         if (GameManager.Instance.Score < healCostScore)
         {
-            Debug.Log("[NPC] Score insufficiente!");
+            Debug.Log("[NPC] Score insufficiente per cura!");
             return;
         }
 
@@ -77,6 +82,24 @@ public class NPC : MonoBehaviour
         {
             if (healFullHP) playerHealth.HealFull();
             Debug.Log($"[NPC] Curato! Score = {GameManager.Instance.Score}");
+        }
+    }
+
+    public void TryBoostAttack()
+    {
+        if (GameManager.Instance == null) return;
+        if (GameManager.Instance.Score < boostCostScore)
+        {
+            Debug.Log("[NPC] Score insufficiente per potenziamento!");
+            return;
+        }
+
+        GameManager.Instance.AddScore(-boostCostScore);
+        var playerAttack = playerTransform.GetComponent<PlayerAttack>();
+        if (playerAttack != null)
+        {
+            playerAttack.ApplyAttackBoost(boostDuration, boostMultiplier);
+            Debug.Log($"[NPC] Attacco potenziato! Score = {GameManager.Instance.Score}");
         }
     }
 }

@@ -81,9 +81,32 @@ public static class PlayFabAuth
                 PlayerPrefs.SetString(EMAIL_KEY, email);
                 PlayerPrefs.Save();
                 Debug.Log($"[PlayFab] Registrato OK! PlayerId={PlayerId}");
+
+                // >>> NUOVO: aggiunge la contact email -> scatena la rule -> invia email di verifica
+                AddContactEmail(email);
+
                 OnLoginSuccess?.Invoke();
             },
             OnError);
+    }
+
+    // ----------- CONTACT EMAIL (per verifica) -----------
+    private static void AddContactEmail(string email)
+    {
+        var request = new AddOrUpdateContactEmailRequest
+        {
+            EmailAddress = email
+        };
+
+        PlayFabClientAPI.AddOrUpdateContactEmail(request,
+            result =>
+            {
+                Debug.Log($"[PlayFab] Contact email aggiunta ({email}). Email di verifica in arrivo.");
+            },
+            error =>
+            {
+                Debug.LogWarning($"[PlayFab] Impossibile aggiungere contact email: {error.GenerateErrorReport()}");
+            });
     }
 
     public static string GetRememberedEmail()

@@ -31,9 +31,9 @@ public class WaveUI : MonoBehaviour
     {
         if (waveText == null || canvasGroup == null) return;
         if (total == 0)
-            waveText.text = $"ENDLESS - WAVE {current}";
+            waveText.text = $"INFINITO - ONDATA {current}";
         else
-            waveText.text = $"WAVE {current} / {total}";
+            waveText.text = $"ONDATA {current} / {total}";
         StartCoroutine(FadeInOut());
     }
 

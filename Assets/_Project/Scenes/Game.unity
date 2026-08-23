@@ -3629,6 +3629,7 @@ GameObject:
   - component: {fileID: 535356975}
   - component: {fileID: 535356978}
   - component: {fileID: 535356979}
+  - component: {fileID: 535356980}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -3768,6 +3769,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CameraFollow
   target: {fileID: 492128398}
   smoothSpeed: 5
+--- !u!114 &535356980
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 535356974}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0fb8e3f1f3760c540ab6b08362665733, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CameraShake
 --- !u!1 &546225782
 GameObject:
   m_ObjectHideFlags: 0

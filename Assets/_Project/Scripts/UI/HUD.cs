@@ -42,7 +42,7 @@ public class HUD : MonoBehaviour
 
     private void UpdateScore(int s)
     {
-        scoreText.text = $"Score: {s}";
+        scoreText.text = s.ToString();
         StartCoroutine(ScalePop(scoreText.transform));
     }
 

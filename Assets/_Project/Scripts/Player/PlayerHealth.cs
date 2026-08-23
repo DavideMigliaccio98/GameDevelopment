@@ -16,6 +16,9 @@ public class PlayerHealth : MonoBehaviour
 
     private void Awake()
     {
+        // FIX: assegna lo SpriteRenderer (era null -> flash non partiva mai)
+        sr = GetComponentInChildren<SpriteRenderer>();
+
         if (GameManager.Instance != null && GameManager.Instance.LastPlayerHP > 0)
         {
             CurrentHP = GameManager.Instance.LastPlayerHP;
@@ -29,7 +32,6 @@ public class PlayerHealth : MonoBehaviour
 
     private void Start()
     {
-        // notifica l'HUD del valore corrente DOPO che è sottoscritto
         OnHpChanged?.Invoke(CurrentHP, maxHP);
     }
 
@@ -38,7 +40,12 @@ public class PlayerHealth : MonoBehaviour
         if (IsDead) return;
         CurrentHP = Mathf.Max(0, CurrentHP - dmg);
         OnHpChanged?.Invoke(CurrentHP, maxHP);
+
+        // Feedback visivo + sonoro
         StartCoroutine(FlashRed());
+        if (AudioManager.Instance != null) AudioManager.Instance.PlayPlayerHurt();
+        if (CameraShake.Instance != null) CameraShake.Instance.Shake(0.15f, 0.12f);
+
         Debug.Log($"Player HP: {CurrentHP}/{maxHP}");
 
         if (CurrentHP <= 0)
@@ -59,8 +66,8 @@ public class PlayerHealth : MonoBehaviour
     {
         if (sr == null) yield break;
         Color orig = sr.color;
-        sr.color = new Color(1f, 0.4f, 0.4f);
-        yield return new WaitForSeconds(0.1f);
+        sr.color = new Color(1f, 0.3f, 0.3f);
+        yield return new WaitForSeconds(0.12f);
         sr.color = orig;
     }
 

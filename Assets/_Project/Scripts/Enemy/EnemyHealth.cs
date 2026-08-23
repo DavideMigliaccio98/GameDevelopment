@@ -20,6 +20,8 @@ public class EnemyHealth : MonoBehaviour
     {
         anim = GetComponent<Animator>();
         sr = GetComponent<SpriteRenderer>();
+        // fallback se lo sprite � su un figlio
+        if (sr == null) sr = GetComponentInChildren<SpriteRenderer>();
         CurrentHP = maxHP;
     }
 
@@ -47,6 +49,10 @@ public class EnemyHealth : MonoBehaviour
             Instantiate(deathParticlesPrefab, spawnPos, Quaternion.identity);
         }
         isDead = true;
+
+        // SFX morte nemico
+        if (AudioManager.Instance != null) AudioManager.Instance.PlayEnemyDeath();
+
         if (GameManager.Instance != null) GameManager.Instance.AddScore(scoreOnDeath);
         OnDied?.Invoke();
         Destroy(gameObject, 0.3f);
@@ -56,7 +62,7 @@ public class EnemyHealth : MonoBehaviour
     {
         if (sr == null) yield break;
         Color orig = sr.color;
-        sr.color = new Color(1f, 0.4f, 0.4f);
+        sr.color = new Color(1f, 0.3f, 0.3f);
         yield return new WaitForSeconds(0.1f);
         sr.color = orig;
     }

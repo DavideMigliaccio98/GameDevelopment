@@ -10,6 +10,8 @@ public class DialogUI : MonoBehaviour
     [SerializeField] private Button nextButton;
     [SerializeField] private Button healButton;
     [SerializeField] private TextMeshProUGUI healButtonLabel;
+    [SerializeField] private Button boostButton;
+    [SerializeField] private TextMeshProUGUI boostButtonLabel;
     [SerializeField] private Button closeButton;
 
     private NPC currentNpc;
@@ -36,12 +38,21 @@ public class DialogUI : MonoBehaviour
         if (currentLine < lines.Count)
         {
             if (dialogText != null) dialogText.text = lines[currentLine];
-            // Se è l'ultima frase, mostra il bottone cura
+
             bool isLast = currentLine == lines.Count - 1;
             if (nextButton != null) nextButton.gameObject.SetActive(!isLast);
+
+            // Opzioni negozio: appaiono all'ultima frase
             if (healButton != null) healButton.gameObject.SetActive(isLast);
-            if (isLast && healButtonLabel != null)
-                healButtonLabel.text = $"CURA ({currentNpc.HealCost} pt)";
+            if (boostButton != null) boostButton.gameObject.SetActive(isLast);
+
+            if (isLast)
+            {
+                if (healButtonLabel != null)
+                    healButtonLabel.text = $"CURA ({currentNpc.HealCost} pt)";
+                if (boostButtonLabel != null)
+                    boostButtonLabel.text = $"POTENZIA ({currentNpc.BoostCost} pt)";
+            }
         }
     }
 
@@ -54,6 +65,12 @@ public class DialogUI : MonoBehaviour
     public void OnHeal()
     {
         if (currentNpc != null) currentNpc.TryHeal();
+        Close();
+    }
+
+    public void OnBoost()
+    {
+        if (currentNpc != null) currentNpc.TryBoostAttack();
         Close();
     }
 
