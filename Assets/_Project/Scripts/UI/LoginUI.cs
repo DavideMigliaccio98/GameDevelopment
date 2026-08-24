@@ -83,19 +83,31 @@ public class LoginUI : MonoBehaviour
     }
 
     // ---------- REGISTRAZIONE ----------
+    /// <summary>
+    /// I controlli si fanno qui, prima di chiamare il server.
+    ///
+    /// PlayFab, davanti a un campo sbagliato, risponde "Invalid input
+    /// parameters": e' vero ma non dice QUALE campo, e l'utente resta a
+    /// indovinare. Verificare le stesse regole in locale permette di dire
+    /// subito cosa c'e' da cambiare, e senza aspettare il giro in rete.
+    /// Il server ricontrolla comunque tutto: questo e' un aiuto, non una difesa.
+    /// </summary>
     public void OnRegisterConfirmPressed()
     {
         string email = regEmailInput.text.Trim();
         string pass = regPasswordInput.text;
         string user = regUsernameInput.text.Trim();
+
         if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(pass) || string.IsNullOrEmpty(user))
         {
-            SetStatus("Compila email, password e username.", true);
+            SetStatus("Compila email, password e nome utente.", true);
             return;
         }
-        if (pass.Length < 6)
+
+        string problem = FirstProblem(email, pass, user);
+        if (problem != null)
         {
-            SetStatus("Password almeno 6 caratteri.", true);
+            SetStatus(problem, true);
             return;
         }
 
@@ -103,6 +115,31 @@ public class LoginUI : MonoBehaviour
         SetButtons(false);
         SetStatus("Registrazione in corso...", false);
         PlayFabAuth.Register(email, pass, user);
+    }
+
+    /// <summary>
+    /// Il primo campo che non va bene, con la sua regola. Null se e' tutto a posto.
+    /// </summary>
+    private static string FirstProblem(string email, string pass, string user)
+    {
+        if (!LooksLikeEmail(email))
+            return "Indirizzo email non valido.";
+
+        if (user.Length < PlayFabAuth.UsernameMinLength || user.Length > PlayFabAuth.UsernameMaxLength)
+            return $"Nome utente: da {PlayFabAuth.UsernameMinLength} a "
+                   + $"{PlayFabAuth.UsernameMaxLength} caratteri.";
+
+        foreach (char c in user)
+        {
+            if (!char.IsLetterOrDigit(c))
+                return "Nome utente: solo lettere e numeri, senza spazi ne' simboli.";
+        }
+
+        if (pass.Length < PlayFabAuth.PasswordMinLength || pass.Length > PlayFabAuth.PasswordMaxLength)
+            return $"Password: da {PlayFabAuth.PasswordMinLength} a "
+                   + $"{PlayFabAuth.PasswordMaxLength} caratteri.";
+
+        return null;
     }
 
     // ---------- OSPITE ----------
@@ -115,12 +152,31 @@ public class LoginUI : MonoBehaviour
     }
 
     // ---------- RECUPERO PASSWORD ----------
+    /// <summary>
+    /// Due esiti soli, e detti chiaramente:
+    /// l'email parte, oppure quell'indirizzo non va bene.
+    ///
+    /// C'era prima un messaggio volutamente vago ("se l'indirizzo e' registrato
+    /// riceverai un'email"), pensato per non far capire a nessuno quali
+    /// indirizzi esistono nel gioco. Non serviva a niente: PlayFab risponde
+    /// InvalidEmailAddress per un indirizzo non registrato, quindi l'altro ramo
+    /// lo diceva comunque. Il risultato era il peggiore dei due mondi, vago
+    /// quando funzionava e esplicito quando no.
+    /// </summary>
     public void OnForgotPasswordPressed()
     {
         string email = emailInput != null ? emailInput.text.Trim() : "";
         if (string.IsNullOrEmpty(email))
         {
             SetStatus("Scrivi la tua email qui sopra, poi premi di nuovo.", true);
+            return;
+        }
+
+        // Controllo di forma prima di disturbare il server: un indirizzo senza
+        // chiocciola o senza punto e' sbagliato e basta.
+        if (!LooksLikeEmail(email))
+        {
+            SetStatus("Indirizzo email non valido.", true);
             return;
         }
 
@@ -131,16 +187,13 @@ public class LoginUI : MonoBehaviour
         {
             SetButtons(true);
 
-            if (ok || IsUnknownAccount(code))
+            if (ok)
             {
-                // Stesso messaggio se l'email esiste e se non esiste. Rispondere
-                // "questo indirizzo non risulta" direbbe a chiunque quali email
-                // sono registrate, che e' un modo per raccogliere account altrui.
-                SetStatus("Se l'indirizzo e' registrato, riceverai un'email con le istruzioni.", false);
+                SetStatus("Riceverai un'email con le istruzioni.", false);
                 return;
             }
 
-            if (code == PlayFabErrorCode.InvalidEmailAddress)
+            if (IsUnknownAccount(code))
             {
                 SetStatus("Indirizzo email non valido.", true);
                 return;
@@ -151,13 +204,30 @@ public class LoginUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Errori che rivelerebbero se un indirizzo e' registrato o meno.
-    /// Vengono trattati come una riuscita, con lo stesso messaggio neutro.
+    /// Controllo minimo della forma dell'indirizzo: una chiocciola, qualcosa
+    /// prima, e un punto dopo. Non serve di piu': la verifica vera la fa il
+    /// server, questa evita solo di chiamarlo per un errore di battitura.
+    /// </summary>
+    private static bool LooksLikeEmail(string value)
+    {
+        int at = value.IndexOf('@');
+        if (at <= 0) return false;
+        if (value.IndexOf('@', at + 1) >= 0) return false;   // piu' di una chiocciola
+
+        int dot = value.IndexOf('.', at + 2);
+        return dot > 0 && dot < value.Length - 1;
+    }
+
+    /// <summary>
+    /// Errori che vogliono dire "questo indirizzo non risulta". PlayFab ne usa
+    /// piu' di uno a seconda che l'account non esista, che esista senza email
+    /// di contatto, o che l'indirizzo sia scritto male.
     /// </summary>
     private static bool IsUnknownAccount(PlayFabErrorCode code)
     {
         return code == PlayFabErrorCode.AccountNotFound
-            || code == PlayFabErrorCode.NoContactEmailAddressFound;
+            || code == PlayFabErrorCode.NoContactEmailAddressFound
+            || code == PlayFabErrorCode.InvalidEmailAddress;
     }
 
     // ---------- CALLBACK ----------

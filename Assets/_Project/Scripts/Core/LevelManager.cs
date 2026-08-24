@@ -33,6 +33,8 @@ public class LevelManager : MonoBehaviour
     [SerializeField] private LayerMask spawnBlockMask = ~0;
     [Tooltip("Scostamento provato quando uno spawn point esplicito e' gia' occupato.")]
     [SerializeField] private float spawnJitter = 1.2f;
+    [Tooltip("Pausa tra un nemico e l'altro dentro la stessa ondata. A zero compaiono tutti insieme.")]
+    [SerializeField] private float spawnInterval = 0.08f;
     [Tooltip("Scrive in Console distanza e modalita' di ogni comparsa. Serve solo per diagnosticare.")]
     [SerializeField] private bool logSpawns = false;
 
@@ -45,6 +47,13 @@ public class LevelManager : MonoBehaviour
     public int CurrentWave { get; private set; } = 0;
     public int TotalWaves => levelData != null ? levelData.waves.Length : 0;
     public int EnemiesAlive => activeEnemies.Count;
+
+    /// <summary>
+    /// I nemici vivi, per chi ha bisogno di sapere dove sono (il radar).
+    /// Puo' contenere caselle vuote: chi la legge deve saltare i null, perche'
+    /// la ripulitura avviene nel ciclo dell'ondata e non a ogni fotogramma.
+    /// </summary>
+    public IReadOnlyList<GameObject> ActiveEnemies => activeEnemies;
 
     public event Action<int, int> OnWaveStarted; // current, total
     public event Action OnLevelCompleted;
@@ -124,7 +133,10 @@ public class LevelManager : MonoBehaviour
                 Debug.Log($"[Level] Wave {CurrentWave}/{TotalWaves}");
                 OnWaveStarted?.Invoke(CurrentWave, TotalWaves);
 
-                SpawnWave(levelData.waves[i]);
+                // si aspetta che l'ondata sia comparsa tutta prima di stare a
+                // guardare se e' finita, altrimenti al primo controllo la lista
+                // e' ancora vuota e l'ondata risulta gia' completata
+                yield return SpawnWave(levelData.waves[i]);
 
                 while (activeEnemies.Count > 0)
                 {
@@ -163,6 +175,7 @@ public class LevelManager : MonoBehaviour
             for (int i = 0; i < count; i++)
             {
                 SpawnOne();
+                if (spawnInterval > 0f) yield return new WaitForSeconds(spawnInterval);
             }
 
             while (activeEnemies.Count > 0)
@@ -180,11 +193,22 @@ public class LevelManager : MonoBehaviour
         }
     }
 
-    private void SpawnWave(WaveData wave)
+    /// <summary>
+    /// I nemici dell'ondata non compaiono tutti nello stesso fotogramma.
+    ///
+    /// Dal quarto livello in poi le ondate arrivano a 18 e 25 nemici: crearli
+    /// tutti insieme fa uno scatto visibile (ognuno fa decine di controlli
+    /// sulla fisica per trovare posto) e li fa arrivare addosso in blocco.
+    /// Distanziati di un soffio l'uno dall'altro entrano in scena come un
+    /// gruppo che avanza invece che come un muro comparso dal nulla.
+    /// </summary>
+    private IEnumerator SpawnWave(WaveData wave)
     {
         for (int i = 0; i < wave.enemyCount; i++)
         {
             SpawnOne();
+            if (spawnInterval > 0f && i < wave.enemyCount - 1)
+                yield return new WaitForSeconds(spawnInterval);
         }
     }
 
@@ -295,13 +319,12 @@ public class LevelManager : MonoBehaviour
         {
             float ang = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
             Vector2 dir = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang));
-            float wanted = UnityEngine.Random.Range(spawnMinDistance, spawnMaxDistance);
 
             // margine di sicurezza: ci si ferma prima dell'ostacolo, non addosso
             float room = FreeDistance(origin, dir, spawnMaxDistance) - Clearance * 1.2f;
-            float dist = Mathf.Min(wanted, room);
+            if (room < spawnAbsoluteMinDistance) { tooTight++; continue; }
 
-            if (dist < spawnAbsoluteMinDistance) { tooTight++; continue; }
+            float dist = PickDistance(room);
 
             Vector3 pos = origin + (Vector3)(dir * dist);
             if (!IsFree(pos)) { occupied++; continue; }   // di solito un altro nemico appena creato
@@ -332,6 +355,35 @@ public class LevelManager : MonoBehaviour
                          + $"nemico a {Vector2.Distance(last, origin):F1} unita "
                          + $"({tooTight} direzioni strette, {occupied} occupate su {Attempts} tentativi).");
         return last;
+    }
+
+    /// <summary>
+    /// Sceglie a che distanza fermarsi, dato lo spazio disponibile in quella
+    /// direzione.
+    ///
+    /// La versione precedente faceva Min(distanza voluta, spazio disponibile).
+    /// Sembra ragionevole e invece e' il motivo per cui i nemici comparivano
+    /// TUTTI IN FILA: quando lo spazio e' meno di quanto si vorrebbe, quel Min
+    /// restituisce sempre e comunque lo spazio disponibile, cioe' esattamente
+    /// il bordo dell'area giocabile. Con un'ondata da diciotto nemici e un
+    /// bordo vicino, diciotto punti finivano tutti sulla stessa riga, allineati
+    /// sul perimetro e appiccicati l'uno all'altro.
+    ///
+    /// Qui invece si pesca una distanza a caso DENTRO lo spazio disponibile, e
+    /// non si prende mai il massimo secco: si resta larghi quando c'e' posto,
+    /// ci si stringe quando non ce n'e', ma sparsi.
+    /// </summary>
+    private float PickDistance(float room)
+    {
+        float hi = Mathf.Min(spawnMaxDistance, room);
+
+        // Si punta alla distanza voluta, ma lasciando sempre almeno un paio di
+        // unita' di gioco tra il piu' vicino e il piu' lontano, altrimenti in
+        // uno spazio stretto si ricasca nell'allineamento.
+        float lo = Mathf.Max(spawnAbsoluteMinDistance, Mathf.Min(spawnMinDistance, hi - 2f));
+        if (lo > hi) lo = hi;
+
+        return UnityEngine.Random.Range(lo, hi);
     }
 
     /// <summary>
@@ -433,8 +485,11 @@ public class LevelManager : MonoBehaviour
             float ang = startAngle + i * (Mathf.PI * 2f / Directions);
             Vector2 dir = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang));
 
-            float dist = FreeDistance(origin, dir, spawnMaxDistance) - Clearance * 1.2f;
-            if (dist <= 0f) continue;
+            float room = FreeDistance(origin, dir, spawnMaxDistance) - Clearance * 1.2f;
+            if (room <= 0f) continue;
+
+            // anche qui non si prende il massimo secco, per non allineare tutti
+            float dist = room * UnityEngine.Random.Range(0.7f, 1f);
 
             Vector3 candidate = origin + (Vector3)(dir * dist);
             if (!IsFree(candidate)) continue;

@@ -5439,6 +5439,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   spawnJitter: 1.2
+  spawnInterval: 0.08
   logSpawns: 0
   groundTilemap: {fileID: 0}
   areaMargin: 1.5
@@ -6219,7 +6220,7 @@ Transform:
   m_GameObject: {fileID: 861498038}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 17.33, y: 0.69, z: 0}
+  m_LocalPosition: {x: 17.42, y: 0.69, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -39076,7 +39077,7 @@ Transform:
   m_GameObject: {fileID: 2113959347}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -19.26, y: 0.81, z: 0}
+  m_LocalPosition: {x: -20.32, y: 0.81, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

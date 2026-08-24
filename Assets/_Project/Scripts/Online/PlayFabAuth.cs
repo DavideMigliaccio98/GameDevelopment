@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Text;
 using PlayFab;
 using PlayFab.ClientModels;
 using UnityEngine;
@@ -7,6 +9,13 @@ public static class PlayFabAuth
 {
     private const string CUSTOM_ID_KEY = "playfab_custom_id";
     private const string EMAIL_KEY = "playfab_remember_email";
+
+    // Regole di PlayFab, riportate qui per poterle dire all'utente PRIMA di
+    // fargli fare il giro fino al server e tornare con un errore generico.
+    public const int UsernameMinLength = 3;
+    public const int UsernameMaxLength = 20;
+    public const int PasswordMinLength = 6;
+    public const int PasswordMaxLength = 100;
 
     public static bool IsLoggedIn { get; private set; } = false;
     public static string PlayerId { get; private set; } = "";
@@ -120,8 +129,111 @@ public static class PlayFabAuth
             e =>
             {
                 Debug.LogWarning($"[PlayFab] Recupero password fallito: {e.GenerateErrorReport()}");
-                onDone?.Invoke(false, e.Error, e.ErrorMessage);
+                onDone?.Invoke(false, e.Error, Describe(e));
             });
+    }
+
+    // ----------- MESSAGGI DI ERRORE -----------
+    /// <summary>
+    /// Trasforma un errore di PlayFab in una frase che dice cosa c'e' da
+    /// cambiare.
+    ///
+    /// Prima si mostrava direttamente error.ErrorMessage, e in registrazione
+    /// quello e' quasi sempre "Invalid input parameters": vero ma inutile, non
+    /// dice quale campo. Il dettaglio sta in ErrorDetails, un dizionario
+    /// campo -> elenco di problemi, che nessuno guardava.
+    /// </summary>
+    public static string Describe(PlayFabError error)
+    {
+        if (error == null) return "Errore sconosciuto.";
+
+        switch (error.Error)
+        {
+            case PlayFabErrorCode.EmailAddressNotAvailable:
+                return "Questa email e' gia' registrata. Prova ad accedere.";
+
+            case PlayFabErrorCode.UsernameNotAvailable:
+                return "Questo nome utente e' gia' preso. Scegline un altro.";
+
+            case PlayFabErrorCode.InvalidEmailAddress:
+                return "Indirizzo email non valido.";
+
+            case PlayFabErrorCode.InvalidUsername:
+                return $"Nome utente non valido: da {UsernameMinLength} a {UsernameMaxLength} "
+                       + "caratteri, solo lettere e numeri.";
+
+            case PlayFabErrorCode.InvalidPassword:
+                return $"Password non valida: da {PasswordMinLength} a {PasswordMaxLength} caratteri.";
+
+            case PlayFabErrorCode.InvalidEmailOrPassword:
+            case PlayFabErrorCode.InvalidUsernameOrPassword:
+            case PlayFabErrorCode.AccountNotFound:
+                return "Email o password non corretti.";
+
+            case PlayFabErrorCode.AccountBanned:
+                return "Questo account e' stato bloccato.";
+
+            case PlayFabErrorCode.ConnectionError:
+                return "Nessuna connessione. Controlla la rete e riprova.";
+
+            case PlayFabErrorCode.ServiceUnavailable:
+            case PlayFabErrorCode.InternalServerError:
+                return "Servizio non raggiungibile. Riprova tra poco.";
+        }
+
+        // InvalidParams e simili: il codice non basta, ma i campi ci sono
+        string detailed = FromDetails(error);
+        if (!string.IsNullOrEmpty(detailed)) return detailed;
+
+        return string.IsNullOrEmpty(error.ErrorMessage) ? "Operazione non riuscita." : error.ErrorMessage;
+    }
+
+    /// <summary>
+    /// Ricava il messaggio dai campi segnalati da PlayFab.
+    ///
+    /// Si traduce il NOME del campo, non il testo inglese che arriva: quel testo
+    /// puo' cambiare da un aggiornamento all'altro del servizio, mentre il nome
+    /// del campo e' stabile. Al massimo due righe: la riga di stato e' una sola
+    /// e su un telefono non ci sta un elenco.
+    /// </summary>
+    private static string FromDetails(PlayFabError error)
+    {
+        if (error.ErrorDetails == null || error.ErrorDetails.Count == 0) return "";
+
+        var sb = new StringBuilder();
+        int shown = 0;
+
+        foreach (KeyValuePair<string, List<string>> field in error.ErrorDetails)
+        {
+            if (shown >= 2) break;
+            if (sb.Length > 0) sb.Append('\n');
+            sb.Append(FieldRule(field.Key));
+            shown++;
+
+            Debug.LogWarning($"[PlayFab] Campo '{field.Key}': "
+                             + string.Join(" | ", field.Value ?? new List<string>()));
+        }
+
+        return sb.ToString();
+    }
+
+    private static string FieldRule(string field)
+    {
+        switch (field)
+        {
+            case "Email":
+                return "Indirizzo email non valido.";
+            case "Password":
+                return $"Password: da {PasswordMinLength} a {PasswordMaxLength} caratteri.";
+            case "Username":
+                return $"Nome utente: da {UsernameMinLength} a {UsernameMaxLength} caratteri, "
+                       + "solo lettere e numeri, senza spazi.";
+            case "DisplayName":
+                return "Nome visualizzato non valido: da 3 a 25 caratteri.";
+            case "TitleId":
+                return "Configurazione del gioco non valida.";
+        }
+        return field + ": valore non valido.";
     }
 
     // ----------- CONTACT EMAIL (per verifica) -----------
@@ -169,7 +281,9 @@ public static class PlayFabAuth
     private static void OnError(PlayFabError error)
     {
         IsLoggedIn = false;
+        // In Console resta il rapporto completo, per poter indagare;
+        // all'utente va la frase leggibile.
         Debug.LogError($"[PlayFab] Errore: {error.GenerateErrorReport()}");
-        OnLoginFailed?.Invoke(error.ErrorMessage);
+        OnLoginFailed?.Invoke(Describe(error));
     }
 }

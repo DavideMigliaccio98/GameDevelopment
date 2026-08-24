@@ -59,12 +59,14 @@ public static class OakheartDepth
     [MenuItem("Tools/Oakheart/Grafica/Ordina per profondita'")]
     public static void ApplyActive()
     {
+        int renderers = SetRendererSortAxis();
         int changed = SetSortAxis();
         int points = SetSortPoints();
         int backs = SetCameraBackground();
 
         EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
-        Debug.Log($"[Oakheart] Profondita': asse impostato su {changed} camere, "
+        Debug.Log($"[Oakheart] Profondita': {renderers} renderer URP corretti, "
+                  + $"asse impostato su {changed} camere, "
                   + $"{points} sprite ordinati dal pivot, {backs} fondi camera aggiornati.");
 
         if (!Silent)
@@ -77,6 +79,56 @@ public static class OakheartDepth
                 "Il fondo della camera prende la tinta del terreno di questa " +
                 "scena, cosi le fessure nell'arte delle rocce di bordo non si " +
                 "vedono piu'.", "OK");
+    }
+
+    /// <summary>
+    /// L'asse di ordinamento del renderer 2D di URP.
+    ///
+    /// Questa e' l'impostazione che comanda davvero, e per un bel po' e' stata
+    /// quella sbagliata. Il progetto usa URP con il Renderer 2D, e quel renderer
+    /// ha una PROPRIA voce Transparency Sort Mode dentro Assets/Settings/
+    /// Renderer2D.asset che ha la precedenza su quella di Project Settings e su
+    /// quella delle camere. Era su Default, cioe' "ordina per distanza dalla
+    /// camera": e siccome in un gioco 2D tutti gli sprite stanno a z = 0, quella
+    /// distanza e' identica per tutti. A parita' di valore l'ordine lo decide
+    /// un criterio interno, che cambia quando cambia lo sprite disegnato: da
+    /// qui il personaggio che, fermo dentro un cespuglio, sfarfalla davanti e
+    /// dietro a ogni fotogramma dell'animazione da fermo.
+    ///
+    /// L'asse era gia' scritto correttamente (0, 1, 0), ma con la modalita' su
+    /// Default veniva semplicemente ignorato.
+    /// </summary>
+    private static int SetRendererSortAxis()
+    {
+        const int CustomAxis = 3;   // UnityEngine.TransparencySortMode.CustomAxis
+        Vector3 wanted = new Vector3(0f, 1f, 0f);
+
+        int n = 0;
+        foreach (string guid in AssetDatabase.FindAssets("t:ScriptableRendererData"))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            var data = AssetDatabase.LoadAssetAtPath<ScriptableObject>(path);
+            if (data == null) continue;
+
+            var so = new SerializedObject(data);
+            SerializedProperty mode = so.FindProperty("m_TransparencySortMode");
+            if (mode == null) continue;              // non e' un renderer 2D
+
+            SerializedProperty axis = so.FindProperty("m_TransparencySortAxis");
+
+            bool changed = false;
+            if (mode.intValue != CustomAxis) { mode.intValue = CustomAxis; changed = true; }
+            if (axis != null && axis.vector3Value != wanted) { axis.vector3Value = wanted; changed = true; }
+            if (!changed) continue;
+
+            so.ApplyModifiedProperties();
+            EditorUtility.SetDirty(data);
+            n++;
+            Debug.Log($"[Oakheart] Renderer 2D '{path}': ordinamento sull'asse Y.");
+        }
+
+        if (n > 0) AssetDatabase.SaveAssets();
+        return n;
     }
 
     /// <summary>
