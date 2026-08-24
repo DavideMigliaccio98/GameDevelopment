@@ -290,6 +290,93 @@ public static class OakheartDialogSkin
         Debug.Log("[Oakheart] DialogPanel sostituito con il Prefab in " + SceneManager.GetActiveScene().name);
     }
 
+    // ================================================================
+    /// <summary>
+    /// Aggiunge al Prefab la riga che mostra l'esito di CURA e POTENZIA.
+    /// Va fatto sul Prefab e non sulla scena: le quattro scene ne sono istanze,
+    /// modificarne una creerebbe un override che le altre tre non vedono.
+    /// </summary>
+    [MenuItem("Tools/Oakheart/DialogPanel/4. Aggiungi riga esito al Prefab")]
+    public static void AddFeedbackRow()
+    {
+        var asset = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+        if (asset == null)
+        {
+            EditorUtility.DisplayDialog("Oakheart",
+                "Prefab non trovato:\n" + PrefabPath + "\n\nLancia prima il passo 2.", "OK");
+            return;
+        }
+
+        var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontPath);
+        if (font == null)
+        {
+            EditorUtility.DisplayDialog("Oakheart", "Font non trovato:\n" + FontPath, "OK");
+            return;
+        }
+
+        GameObject contents = PrefabUtility.LoadPrefabContents(PrefabPath);
+        try
+        {
+            Transform box = FindDeep(contents.transform, "DialogBox");
+            if (box == null)
+            {
+                EditorUtility.DisplayDialog("Oakheart", "DialogBox non trovato nel Prefab.", "OK");
+                return;
+            }
+
+            Transform fb = FindDeep(contents.transform, "FeedbackText");
+            TextMeshProUGUI tmp;
+            if (fb == null)
+            {
+                var go = new GameObject("FeedbackText", typeof(RectTransform));
+                go.transform.SetParent(box, false);
+                tmp = go.AddComponent<TextMeshProUGUI>();
+                fb = go.transform;
+            }
+            else
+            {
+                if (fb.parent != box) fb.SetParent(box, false);
+                tmp = fb.GetComponent<TextMeshProUGUI>();
+                if (tmp == null) tmp = fb.gameObject.AddComponent<TextMeshProUGUI>();
+            }
+
+            var rt = fb.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot     = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = new Vector2(BoxW - 140f, 56f);
+
+            tmp.text = string.Empty;
+            Style(tmp, font, 40f, new Color32(0x9C, 0x2D, 0x2B, 0xFF), TextAlignmentOptions.Center);
+
+            var le = fb.GetComponent<LayoutElement>();
+            if (le == null) le = fb.gameObject.AddComponent<LayoutElement>();
+            le.ignoreLayout = false;
+            le.minHeight = 56f;
+
+            fb.SetAsLastSibling();          // sotto la riga dei bottoni
+            fb.gameObject.SetActive(false); // spento non occupa spazio nel layout
+
+            var ui = contents.GetComponent<DialogUI>();
+            if (ui != null)
+            {
+                var so = new SerializedObject(ui);
+                var p = so.FindProperty("feedbackText");
+                if (p != null) { p.objectReferenceValue = tmp; so.ApplyModifiedProperties(); }
+            }
+
+            PrefabUtility.SaveAsPrefabAsset(contents, PrefabPath);
+            Debug.Log("[Oakheart] Riga esito aggiunta al Prefab e collegata a DialogUI.");
+            EditorUtility.DisplayDialog("Oakheart",
+                "Riga esito aggiunta al Prefab.\nTutte e 4 le scene la ricevono.", "OK");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(contents);
+        }
+    }
+
     // ================================================================ helper
     private static Sprite Load(string relative)
     {

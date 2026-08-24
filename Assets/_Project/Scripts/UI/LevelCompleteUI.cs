@@ -40,7 +40,7 @@ public class LevelCompleteUI : MonoBehaviour
         panel.SetActive(true);
 
         int score = GameManager.Instance != null ? GameManager.Instance.Score : 0;
-        if (scoreText != null) scoreText.text = $"Score: {score}";
+        if (scoreText != null) scoreText.text = score.ToString();   // l'icona stella accanto dice gia' cos'e'
 
         bool isLastLevel = SelectedLevel.Current != null && SelectedLevel.Current.levelNumber == 5;
         if (titleText != null)

@@ -9,6 +9,10 @@ public class EnemyHealth : MonoBehaviour
 
     [SerializeField] private GameObject deathParticlesPrefab;
 
+    [Header("Feedback danno")]
+    [SerializeField] private Color flashColor = new Color(1f, 0.3f, 0.3f);
+    [SerializeField] private float flashDuration = 0.1f;
+
     public int CurrentHP { get; private set; }
     public event Action OnDied;
 
@@ -16,12 +20,19 @@ public class EnemyHealth : MonoBehaviour
     private SpriteRenderer sr;
     private bool isDead = false;
 
+    // Il colore normale si legge UNA volta all'avvio. Leggerlo dentro la coroutine
+    // significava, al secondo colpo ravvicinato, fotografare il rosso del colpo
+    // precedente e poi "ripristinarlo": lo sprite restava rosso per sempre.
+    private Color baseColor = Color.white;
+    private Coroutine flashRoutine;
+
     private void Awake()
     {
         anim = GetComponent<Animator>();
         sr = GetComponent<SpriteRenderer>();
-        // fallback se lo sprite � su un figlio
+        // fallback se lo sprite e' su un figlio
         if (sr == null) sr = GetComponentInChildren<SpriteRenderer>();
+        if (sr != null) baseColor = sr.color;
         CurrentHP = maxHP;
     }
 
@@ -36,7 +47,7 @@ public class EnemyHealth : MonoBehaviour
     {
         if (isDead) return;
         CurrentHP = Mathf.Max(0, CurrentHP - dmg);
-        StartCoroutine(FlashRed());
+        Flash();
         Debug.Log($"Enemy hit! HP rimasti: {CurrentHP}");
         if (CurrentHP <= 0) Die();
     }
@@ -58,12 +69,30 @@ public class EnemyHealth : MonoBehaviour
         Destroy(gameObject, 0.3f);
     }
 
+    /// <summary>
+    /// Un solo lampeggio alla volta: un colpo che arriva mentre il precedente e'
+    /// ancora in corso lo fa ripartire da capo invece di accodarsi.
+    /// </summary>
+    private void Flash()
+    {
+        if (sr == null) return;
+        if (flashRoutine != null) StopCoroutine(flashRoutine);
+        flashRoutine = StartCoroutine(FlashRed());
+    }
+
     private IEnumerator FlashRed()
     {
-        if (sr == null) yield break;
-        Color orig = sr.color;
-        sr.color = new Color(1f, 0.3f, 0.3f);
-        yield return new WaitForSeconds(0.1f);
-        sr.color = orig;
+        sr.color = flashColor;
+        yield return new WaitForSeconds(flashDuration);
+        sr.color = baseColor;
+        flashRoutine = null;
+    }
+
+    private void OnDisable()
+    {
+        // Se l'oggetto viene spento a meta' lampeggio la coroutine muore in
+        // silenzio e il colore resterebbe quello alterato.
+        if (sr != null) sr.color = baseColor;
+        flashRoutine = null;
     }
 }

@@ -22,10 +22,15 @@ public static class OakheartBatch
         "CastleInterior", "CabinInterior", "HouseInterior", "TentInterior"
     };
 
-    /// Scene di contorno: per ora solo il Canvas Scaler, la skin la faremo dopo.
+    /// Nome del bottone di debug da eliminare dal menu principale.
+    private const string DevButtonName = "DevUnlockButton";
+
+    /// Scene di contorno: Canvas Scaler e skin dei menu, niente HUD.
     /// Niente SafeArea qui: hanno sfondi a tutto schermo che devono restare tali,
     /// altrimenti sui telefoni col notch compaiono bande nere ai bordi.
-    private static readonly string[] ScalerOnlyScenes = { "MainMenu", "Login" };
+    /// Boot dura circa un frame (PlayFabBootstrap carica Login in Start), ma se
+    /// resta indietro e' l'unico punto del gioco con il fondale originale.
+    private static readonly string[] ScalerOnlyScenes = { "MainMenu", "Login", "Boot" };
 
     // FishingHutInterior: bozza non usata, esclusa di proposito.
 
@@ -39,9 +44,14 @@ public static class OakheartBatch
             "  - contenitore SafeArea attorno alla UI\n" +
             "  - Canvas Scaler: Match = 0 (Width)\n" +
             "  - skin pixel-art dell'HUD\n" +
-            "  - battute NPC aggiornate negli interni\n\n" +
-            "MainMenu e Login (" + ScalerOnlyScenes.Length + "):\n" +
-            "  - solo Canvas Scaler\n\n" +
+            "  - skin dei pannelli Livello completato e Game over\n" +
+            "  - battute NPC aggiornate negli interni\n" +
+            "  - alone del potenziamento sul Player\n\n" +
+            "MainMenu, Login e Boot (" + ScalerOnlyScenes.Length + "):\n" +
+            "  - Canvas Scaler\n" +
+            "  - rimozione del bottone di debug " + DevButtonName + "\n" +
+            "  - skin di menu, selezione livelli, classifica e login\n" +
+            "  - fondale in duotone al posto del teal\n\n" +
             "Fai un commit prima, se vuoi poter tornare indietro.",
             "Procedi", "Annulla");
         if (!go) return;
@@ -60,6 +70,9 @@ public static class OakheartBatch
 
         OakheartHudSkin.Silent = true;
         OakheartNpcLines.Silent = true;
+        OakheartPanelSkin.Silent = true;
+        OakheartMenuSkin.Silent = true;
+        OakheartBoostAura.Silent = true;
 
         try
         {
@@ -81,6 +94,9 @@ public static class OakheartBatch
         {
             OakheartHudSkin.Silent = false;
             OakheartNpcLines.Silent = false;
+            OakheartPanelSkin.Silent = false;
+            OakheartMenuSkin.Silent = false;
+            OakheartBoostAura.Silent = false;
             EditorUtility.ClearProgressBar();
 
             if (!string.IsNullOrEmpty(original))
@@ -126,7 +142,19 @@ public static class OakheartBatch
                 OakheartHudSkin.ApplySkin();
                 notes.Add("hud");
 
+                OakheartPanelSkin.ApplySkin();
+                notes.Add("esito");
+
                 OakheartNpcLines.UpdateActiveScene();
+
+                OakheartBoostAura.CreateOnPlayer();
+                notes.Add("aura");
+            }
+            else
+            {
+                if (RemoveDevButton(canvas)) notes.Add("rimosso " + DevButtonName);
+                OakheartMenuSkin.ApplyActive();
+                notes.Add("menu");
             }
 
             EditorSceneManager.MarkSceneDirty(scene);
@@ -141,6 +169,23 @@ public static class OakheartBatch
             Debug.LogError("[Oakheart] " + sceneName + ": " + e);
             return false;
         }
+    }
+
+    /// <summary>
+    /// Elimina il bottone di sblocco livelli usato durante lo sviluppo. E' quello
+    /// che ha scritto maxLevel=99 sul profilo PlayFab, e stava in bella vista nel
+    /// menu principale: nella versione da consegnare non ci deve essere.
+    /// </summary>
+    private static bool RemoveDevButton(Canvas canvas)
+    {
+        Transform uiRoot = OakheartHudSkin.UiRoot(canvas);
+        Transform dev = uiRoot.Find(DevButtonName);
+        if (dev == null) return false;
+
+        Undo.DestroyObjectImmediate(dev.gameObject);
+        Debug.Log("[Oakheart] Rimosso " + DevButtonName + " da "
+                  + SceneManager.GetActiveScene().name + ".");
+        return true;
     }
 
     /// <summary>

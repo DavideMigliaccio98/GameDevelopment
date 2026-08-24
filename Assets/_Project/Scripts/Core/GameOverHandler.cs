@@ -47,7 +47,7 @@ public class GameOverHandler : MonoBehaviour
         if (scoreText != null)
 {
     Debug.Log($"[GameOver] Aggiorno scoreText su GameObject: {scoreText.gameObject.name} (parent: {scoreText.transform.parent?.name})");
-    scoreText.text = $"Score: {score}";
+    scoreText.text = score.ToString();   // l'icona stella accanto dice gia' cos'e'
     Debug.Log($"[GameOver] scoreText.text dopo assegnazione = {scoreText.text}");
 }
 

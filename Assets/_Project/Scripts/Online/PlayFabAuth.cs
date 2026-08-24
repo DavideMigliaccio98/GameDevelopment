@@ -82,12 +82,46 @@ public static class PlayFabAuth
                 PlayerPrefs.Save();
                 Debug.Log($"[PlayFab] Registrato OK! PlayerId={PlayerId}");
 
-                // >>> NUOVO: aggiunge la contact email -> scatena la rule -> invia email di verifica
+                // aggiunge la contact email -> scatena la rule -> invia email di verifica
                 AddContactEmail(email);
 
                 OnLoginSuccess?.Invoke();
             },
             OnError);
+    }
+
+    // ----------- RECUPERO PASSWORD -----------
+    /// <summary>
+    /// Chiede a PlayFab di mandare l'email di reimpostazione password.
+    ///
+    /// Non passa dal server SMTP configurato nel titolo: quello serve solo se si
+    /// vuole un modello di email personalizzato. Senza EmailTemplateId, PlayFab
+    /// usa il proprio modello e la propria infrastruttura, quindi questa funziona
+    /// anche mentre la verifica email e' ferma.
+    ///
+    /// La chiamata e' AuthType.None: si puo' invocare senza essere loggati, che e'
+    /// esattamente il caso di chi ha perso la password.
+    /// </summary>
+    public static void SendPasswordReset(string email, Action<bool, PlayFabErrorCode, string> onDone)
+    {
+        var request = new SendAccountRecoveryEmailRequest
+        {
+            Email = email,
+            TitleId = PlayFabSettings.TitleId
+        };
+
+        Debug.Log($"[PlayFab] Recupero password per {email}...");
+        PlayFabClientAPI.SendAccountRecoveryEmail(request,
+            r =>
+            {
+                Debug.Log("[PlayFab] Email di recupero inviata.");
+                onDone?.Invoke(true, PlayFabErrorCode.Success, "");
+            },
+            e =>
+            {
+                Debug.LogWarning($"[PlayFab] Recupero password fallito: {e.GenerateErrorReport()}");
+                onDone?.Invoke(false, e.Error, e.ErrorMessage);
+            });
     }
 
     // ----------- CONTACT EMAIL (per verifica) -----------

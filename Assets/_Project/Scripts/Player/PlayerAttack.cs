@@ -16,13 +16,24 @@ public class PlayerAttack : MonoBehaviour
     // >>> BOOST ATTACCO temporaneo
     private int baseDamage;
     private float boostEndTime = 0f;
+
     public bool IsBoosted => boostEndTime > Time.time;
+    public float BoostRemaining => Mathf.Max(0f, boostEndTime - Time.time);
 
     private void Awake()
     {
         anim = GetComponentInChildren<Animator>();
         pc = GetComponent<PlayerController>();
         baseDamage = damage; // salva il danno base
+
+        // Il Player viene ricreato a ogni scena: senza questo, uscendo dal negozio
+        // il potenziamento appena comprato spariva insieme al vecchio PlayerAttack.
+        if (GameManager.Instance != null && GameManager.Instance.BoostEndTime > Time.time)
+        {
+            boostEndTime = GameManager.Instance.BoostEndTime;
+            damage = Mathf.RoundToInt(baseDamage * GameManager.Instance.BoostMultiplier);
+            Debug.Log($"[Boost] Ripreso dal cambio scena: danno={damage}, restano {BoostRemaining:F1}s");
+        }
     }
 
     private void Update()
@@ -32,16 +43,24 @@ public class PlayerAttack : MonoBehaviour
         {
             damage = baseDamage;
             boostEndTime = 0f;
+            if (GameManager.Instance != null) GameManager.Instance.ClearBoost();
             Debug.Log("[Boost] Attacco tornato normale");
         }
     }
 
     public void ApplyAttackBoost(float duration, float multiplier)
     {
-        // se non gi� boostato, salva il danno base corrente
+        // se non gia' boostato, salva il danno base corrente
         if (boostEndTime <= Time.time) baseDamage = damage;
         damage = Mathf.RoundToInt(baseDamage * multiplier);
         boostEndTime = Time.time + duration;
+
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.BoostEndTime = boostEndTime;
+            GameManager.Instance.BoostMultiplier = multiplier;
+        }
+
         Debug.Log($"[Boost] Attacco potenziato! Danno={damage} per {duration}s");
     }
 

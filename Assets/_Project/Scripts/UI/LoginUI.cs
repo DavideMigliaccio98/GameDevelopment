@@ -1,3 +1,4 @@
+using PlayFab;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -25,6 +26,7 @@ public class LoginUI : MonoBehaviour
     [SerializeField] private Button loginButton;
     [SerializeField] private Button registerButton;
     [SerializeField] private Button guestButton;
+    [SerializeField] private Button forgotButton;
 
     private bool isRegistering = false; // per sapere se stiamo registrando
 
@@ -112,6 +114,52 @@ public class LoginUI : MonoBehaviour
         PlayFabAuth.LoginAsGuest();
     }
 
+    // ---------- RECUPERO PASSWORD ----------
+    public void OnForgotPasswordPressed()
+    {
+        string email = emailInput != null ? emailInput.text.Trim() : "";
+        if (string.IsNullOrEmpty(email))
+        {
+            SetStatus("Scrivi la tua email qui sopra, poi premi di nuovo.", true);
+            return;
+        }
+
+        SetButtons(false);
+        SetStatus("Invio email di recupero...", false);
+
+        PlayFabAuth.SendPasswordReset(email, (ok, code, message) =>
+        {
+            SetButtons(true);
+
+            if (ok || IsUnknownAccount(code))
+            {
+                // Stesso messaggio se l'email esiste e se non esiste. Rispondere
+                // "questo indirizzo non risulta" direbbe a chiunque quali email
+                // sono registrate, che e' un modo per raccogliere account altrui.
+                SetStatus("Se l'indirizzo e' registrato, riceverai un'email con le istruzioni.", false);
+                return;
+            }
+
+            if (code == PlayFabErrorCode.InvalidEmailAddress)
+            {
+                SetStatus("Indirizzo email non valido.", true);
+                return;
+            }
+
+            SetStatus("Invio non riuscito: " + message, true);
+        });
+    }
+
+    /// <summary>
+    /// Errori che rivelerebbero se un indirizzo e' registrato o meno.
+    /// Vengono trattati come una riuscita, con lo stesso messaggio neutro.
+    /// </summary>
+    private static bool IsUnknownAccount(PlayFabErrorCode code)
+    {
+        return code == PlayFabErrorCode.AccountNotFound
+            || code == PlayFabErrorCode.NoContactEmailAddressFound;
+    }
+
     // ---------- CALLBACK ----------
     private void OnSuccess()
     {
@@ -153,5 +201,6 @@ public class LoginUI : MonoBehaviour
         if (loginButton != null) loginButton.interactable = enabled;
         if (registerButton != null) registerButton.interactable = enabled;
         if (guestButton != null) guestButton.interactable = enabled;
+        if (forgotButton != null) forgotButton.interactable = enabled;
     }
 }

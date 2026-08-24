@@ -12,6 +12,19 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private int damage = 10;
     [SerializeField] private float attackCooldown = 1.2f;
 
+    [Header("Ostacoli")]
+    [Tooltip("Layer considerati muro. Il Player viene escluso a parte, non e' un ostacolo.")]
+    [SerializeField] private LayerMask obstacleMask = 1;   // 1 = layer Default
+    [Tooltip("Quanto avanti guarda il nemico per accorgersi di un muro.")]
+    [SerializeField] private float probeDistance = 0.7f;
+    [Tooltip("Meta' larghezza del nemico, piu' un margine.")]
+    [SerializeField] private float probeRadius = 0.22f;
+
+    // Direzioni provate in ordine: dritto verso il player, poi sempre piu' di lato.
+    // La prima libera vince, cosi il nemico "striscia" lungo il muro invece di
+    // restarci incollato.
+    private static readonly float[] ProbeAngles = { 0f, 25f, -25f, 50f, -50f, 75f, -75f };
+
     private Transform player;
     private PlayerHealth playerHealth;
     private Rigidbody2D rb;
@@ -19,11 +32,27 @@ public class EnemyController : MonoBehaviour
     private SpriteRenderer sr;
     private float nextAttackTime = 0f;
 
+    private ContactFilter2D filter;
+    private readonly RaycastHit2D[] castHits = new RaycastHit2D[4];
+
+    // rilevamento blocco
+    private Vector2 lastPos;
+    private float stuckTimer;
+    private Vector2 detourDir;
+    private float detourUntil;
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         anim = GetComponent<Animator>();
         sr = GetComponent<SpriteRenderer>();
+
+        filter = new ContactFilter2D();
+        filter.useTriggers = false;              // le porte e le zone di passaggio non fermano nessuno
+        filter.SetLayerMask(obstacleMask);
+        filter.useLayerMask = true;
+
+        lastPos = rb != null ? rb.position : (Vector2)transform.position;
     }
 
     public void ApplyMultipliers(float speedMult, float damageMult)
@@ -43,19 +72,18 @@ public class EnemyController : MonoBehaviour
         }
     }
 
-    private void Update()
+    // Il movimento sta in FixedUpdate perche' scrive sul Rigidbody2D: in Update
+    // andava fuori passo con la fisica e le collisioni contro i muri erano ballerine.
+    private void FixedUpdate()
     {
         if (player == null) { Stop(); return; }
-
         if (playerHealth != null && playerHealth.IsDead) { Stop(); return; }
 
-        float dist = Vector2.Distance(transform.position, player.position);
+        Vector2 pos = rb.position;
+        Vector2 target = player.position;
+        float dist = Vector2.Distance(pos, target);
 
-        if (dist > aggroRange)
-        {
-            Stop();
-            return;
-        }
+        if (dist > aggroRange) { Stop(); return; }
 
         if (dist <= attackRange)
         {
@@ -64,18 +92,93 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        // insegui
-        Vector2 dir = ((Vector2)player.position - (Vector2)transform.position).normalized;
-        rb.linearVelocity = dir * speed;
+        Vector2 toPlayer = (target - pos).normalized;
+        Vector2 move;
+
+        if (Time.time < detourUntil)
+        {
+            // sta aggirando: tiene la rotta scelta per un momento, altrimenti
+            // tornerebbe subito a spingere contro lo stesso spigolo
+            move = detourDir;
+        }
+        else
+        {
+            move = SteerAround(pos, toPlayer);
+            CheckIfStuck(pos, toPlayer);
+        }
+
+        rb.linearVelocity = move * speed;
         anim.SetBool("isMoving", true);
-        if (Mathf.Abs(dir.x) > 0.01f)
-            sr.flipX = dir.x < 0f;
+        if (Mathf.Abs(move.x) > 0.01f) sr.flipX = move.x < 0f;
+
+        lastPos = pos;
+    }
+
+    /// <summary>
+    /// Prova la direzione verso il player e, se e' occupata, ventagli sempre piu'
+    /// larghi a destra e sinistra. Restituisce la prima direzione libera.
+    /// </summary>
+    private Vector2 SteerAround(Vector2 origin, Vector2 desired)
+    {
+        for (int i = 0; i < ProbeAngles.Length; i++)
+        {
+            Vector2 dir = Rotate(desired, ProbeAngles[i]);
+            if (!Blocked(origin, dir)) return dir;
+        }
+        return desired;   // circondato: spinge comunque, ci pensera' il detour
+    }
+
+    private bool Blocked(Vector2 origin, Vector2 dir)
+    {
+        int n = Physics2D.CircleCast(origin, probeRadius, dir, filter, castHits, probeDistance);
+        for (int i = 0; i < n; i++)
+        {
+            Collider2D c = castHits[i].collider;
+            if (c == null) continue;
+            if (player != null && c.transform == player) continue;   // il player non e' un muro
+            if (c.transform == transform) continue;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Se il nemico prova a muoversi ma non avanza (incastrato in uno spigolo, o
+    /// spinto contro il muro dagli altri), sceglie una direzione laterale per
+    /// mezzo secondo e si sgancia.
+    /// </summary>
+    private void CheckIfStuck(Vector2 pos, Vector2 toPlayer)
+    {
+        float expected = speed * Time.fixedDeltaTime * 0.3f;
+        if ((pos - lastPos).sqrMagnitude < expected * expected)
+        {
+            stuckTimer += Time.fixedDeltaTime;
+            if (stuckTimer >= 0.4f)
+            {
+                float sign = Random.value < 0.5f ? 1f : -1f;
+                detourDir = new Vector2(-toPlayer.y, toPlayer.x) * sign;
+                detourUntil = Time.time + 0.5f;
+                stuckTimer = 0f;
+            }
+        }
+        else
+        {
+            stuckTimer = 0f;
+        }
+    }
+
+    private static Vector2 Rotate(Vector2 v, float degrees)
+    {
+        float r = degrees * Mathf.Deg2Rad;
+        float s = Mathf.Sin(r), c = Mathf.Cos(r);
+        return new Vector2(v.x * c - v.y * s, v.x * s + v.y * c);
     }
 
     private void Stop()
     {
         rb.linearVelocity = Vector2.zero;
         anim.SetBool("isMoving", false);
+        stuckTimer = 0f;
     }
 
     private void TryAttack()
@@ -93,5 +196,7 @@ public class EnemyController : MonoBehaviour
         Gizmos.DrawWireSphere(transform.position, aggroRange);
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackRange);
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawWireSphere(transform.position, probeRadius);
     }
 }
