@@ -24,11 +24,11 @@ public class LevelManager : MonoBehaviour
     [SerializeField] private float spawnMinDistance = 7f;
     [Tooltip("Distanza massima dal player: oltre questa i nemici impiegano troppo ad arrivare.")]
     [SerializeField] private float spawnMaxDistance = 12f;
-    [Tooltip("Spazio libero richiesto attorno al punto di comparsa.")]
-    [SerializeField] private float spawnClearance = 0.45f;
-    [SerializeField] private int spawnAttempts = 30;
-    [Tooltip("Scarta i punti separati dal player da un muro: evita nemici bloccati in stanze chiuse.")]
-    [SerializeField] private bool requireLineOfSight = true;
+    [Tooltip("Distanza sotto la quale non si scende mai, nemmeno quando la mappa e' stretta.")]
+    [SerializeField] private float spawnAbsoluteMinDistance = 4.5f;
+    [Tooltip("Spazio libero richiesto attorno al punto di comparsa. Il nemico e' circa 0.4x0.6.")]
+    [SerializeField] private float spawnClearance = 0.6f;
+    [SerializeField] private int spawnAttempts = 40;
     [Tooltip("Cosa conta come occupato. Lasciare tutto: contano muri, decorazioni e altri nemici.")]
     [SerializeField] private LayerMask spawnBlockMask = ~0;
     [Tooltip("Scostamento provato quando uno spawn point esplicito e' gia' occupato.")]
@@ -51,12 +51,25 @@ public class LevelManager : MonoBehaviour
 
     private List<GameObject> activeEnemies = new List<GameObject>();
     private Transform playerTransform;
+    private Collider2D playerCollider;
 
-    // Rettangolo entro cui e' lecito far comparire un nemico. Senza questo il
-    // controllo "posizione libera" accettava anche i punti OLTRE i muri, dove
-    // ovviamente non c'e' nessun collider.
+    // Rettangolo entro cui e' lecito far comparire un nemico.
     private Bounds spawnArea;
     private bool hasArea;
+
+    // Le scene sono state salvate quando i valori di serie erano piu' bassi
+    // (0.45 e 30), e Unity tiene quelli salvati, non quelli scritti qui sopra.
+    // Con queste due soglie il minimo vale comunque, senza dover riaprire e
+    // risalvare tutte le scene a mano.
+    private float Clearance => Mathf.Max(spawnClearance, 0.55f);
+    private int Attempts => Mathf.Max(spawnAttempts, 40);
+
+    // Scarto tra l'origine del nemico e il suo collider. Nel prefab il collider
+    // non e' centrato sull'origine, quindi controllare che sia libero il punto
+    // dove finisce l'origine non dice niente su dove finisce il corpo.
+    // Tutti i controlli qui sotto ragionano sulla posizione del CORPO, e
+    // l'origine viene ricavata togliendo questo scarto al momento di creare il nemico.
+    private Vector3 enemyBodyOffset = Vector3.zero;
 
     private void Awake()
     {
@@ -71,7 +84,7 @@ public class LevelManager : MonoBehaviour
             levelData = SelectedLevel.Current;
         }
 
-        // determina se è endless
+        // determina se e' endless
         if (levelData != null && levelData.levelNumber == 99)
         {
             isEndless = true;
@@ -90,6 +103,7 @@ public class LevelManager : MonoBehaviour
         }
 
         ResolveSpawnArea();
+        ResolveEnemyBodyOffset();
         Debug.Log($"[LevelManager] Caricato {levelData.levelName}");
         StartCoroutine(RunLevel());
     }
@@ -142,7 +156,6 @@ public class LevelManager : MonoBehaviour
 
             int count = endlessStartEnemies + waveNum;
 
-            // applica difficoltà progressiva via override temporaneo
             levelData.enemyHpMultiplier = hpMult;
             levelData.enemySpeedMultiplier = speedMult;
             levelData.enemyDamageMultiplier = damageMult;
@@ -177,8 +190,14 @@ public class LevelManager : MonoBehaviour
 
     private void SpawnOne()
     {
-        Vector3 pos = GetRandomSpawnPos();
-        GameObject enemy = Instantiate(enemyPrefab, pos, Quaternion.identity);
+        Vector3 bodyPos = GetRandomSpawnPos();
+        GameObject enemy = Instantiate(enemyPrefab, bodyPos - enemyBodyOffset, Quaternion.identity);
+
+        // Senza questo il collider del nemico appena creato non risulta ancora
+        // al motore fisico, e il nemico successivo dello stesso frame puo'
+        // comparire esattamente sopra di lui.
+        Physics2D.SyncTransforms();
+
         ApplyDifficulty(enemy);
         activeEnemies.Add(enemy);
     }
@@ -186,6 +205,26 @@ public class LevelManager : MonoBehaviour
     // ------------------------------------------------------------------
     // Posizionamento
     // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Dove sta il collider del nemico rispetto alla sua origine, letto dal prefab.
+    /// </summary>
+    private void ResolveEnemyBodyOffset()
+    {
+        enemyBodyOffset = Vector3.zero;
+        if (enemyPrefab == null) return;
+
+        var col = enemyPrefab.GetComponentInChildren<Collider2D>();
+        if (col == null) return;
+
+        Vector3 world = col.transform.TransformPoint(col.offset);
+        Vector3 rel = enemyPrefab.transform.InverseTransformPoint(world);
+        enemyBodyOffset = new Vector3(rel.x, rel.y, 0f);
+
+        if (enemyBodyOffset.sqrMagnitude > 0.0001f)
+            Debug.Log($"[LevelManager] Il collider del nemico e' spostato di {enemyBodyOffset} "
+                      + "rispetto alla sua origine: le posizioni di comparsa vengono corrette di conseguenza.");
+    }
 
     private Transform Player
     {
@@ -201,17 +240,27 @@ public class LevelManager : MonoBehaviour
     }
 
     /// <summary>
-    /// I nemici compaiono in un anello attorno al player invece che dentro un
-    /// rettangolo fisso: cosi la posizione e' sempre dentro la mappa qualunque
-    /// sia il livello, e non serve tarare coordinate a mano scena per scena.
-    /// Ogni candidato deve essere libero da collider e (se richiesto) in linea
-    /// d'aria col player, per non far comparire nemici chiusi in un'altra stanza.
+    /// Dove far comparire un nemico.
+    ///
+    /// Il metodo NON e' "estraggo un punto a caso e vedo se va bene". Quella era
+    /// la versione precedente, e in un livello pieno di alberi come Game_Field
+    /// falliva quasi sempre: a 7-12 unita' dal giocatore la linea d'aria e'
+    /// interrotta da qualcosa in quasi tutte le direzioni, tutti i tentativi
+    /// venivano scartati e si finiva ogni volta sull'ultimo ripiego, che piazza
+    /// vicino. Risultato: i nemici comparivano tutti addosso al giocatore.
+    ///
+    /// Qui invece si sceglie una DIREZIONE e si misura quanto si puo' andare
+    /// lontano da quella parte prima di incontrare qualcosa o di uscire
+    /// dall'area. Poi ci si ferma al minimo tra la distanza voluta e quella
+    /// disponibile. Il punto che ne esce e' per costruzione dentro la mappa,
+    /// libero e raggiungibile in linea retta: non c'e' niente da scartare, e
+    /// una direzione stretta produce comunque un punto valido, solo piu' vicino.
     /// </summary>
     private Vector3 GetRandomSpawnPos()
     {
-        // 1) se qualcuno ha configurato degli spawn point espliciti, hanno precedenza,
-        //    ma vengono comunque verificati: prima erano usati alla cieca e piu'
-        //    nemici finivano nello stesso identico punto.
+        Transform pl = Player;
+
+        // 1) spawn point espliciti, se presenti: hanno precedenza ma sono comunque verificati
         if (spawnPoints != null && spawnPoints.Length > 0)
         {
             int start = UnityEngine.Random.Range(0, spawnPoints.Length);
@@ -219,65 +268,236 @@ public class LevelManager : MonoBehaviour
             {
                 Transform sp = spawnPoints[(start + i) % spawnPoints.Length];
                 if (sp == null) continue;
-                if (IsFree(sp.position)) return sp.position;
+                if (Acceptable(sp.position, pl)) return sp.position;
 
                 for (int j = 0; j < 6; j++)
                 {
                     Vector3 jittered = sp.position
                         + (Vector3)(UnityEngine.Random.insideUnitCircle * spawnJitter);
-                    if (IsFree(jittered)) return jittered;
+                    if (Acceptable(jittered, pl)) return jittered;
                 }
             }
         }
 
-        Transform pl = Player;
         if (pl == null)
         {
             Debug.LogWarning("[LevelManager] Nessun Player in scena: spawn all'origine.");
             return Vector3.zero;
         }
 
-        // 2) anello attorno al player, con linea d'aria
-        for (int attempt = 0; attempt < spawnAttempts; attempt++)
-        {
-            Vector3 pos = RandomRingPoint(pl.position);
-            if (!InsideArea(pos)) continue;
-            if (!IsFree(pos)) continue;
-            if (requireLineOfSight && BlockedBetween(pl.position, pos)) continue;
-            if (logSpawns)
-                Debug.Log($"[Spawn] anello, {Vector2.Distance(pos, pl.position):F1} unita dal player (tentativo {attempt + 1})");
-            return pos;
-        }
+        Vector3 origin = PlayerBodyPos();
 
-        // 3) ripiego: si rinuncia alla linea d'aria, basta che sia libero
-        for (int attempt = 0; attempt < spawnAttempts; attempt++)
+        Vector3 best = Vector3.zero;
+        float bestDist = 0f;
+        int tooTight = 0, occupied = 0;
+
+        for (int i = 0; i < Attempts; i++)
         {
-            Vector3 pos = RandomRingPoint(pl.position);
-            if (!InsideArea(pos)) continue;   // il vincolo dell'area NON si molla mai
-            if (IsFree(pos))
+            float ang = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
+            Vector2 dir = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang));
+            float wanted = UnityEngine.Random.Range(spawnMinDistance, spawnMaxDistance);
+
+            // margine di sicurezza: ci si ferma prima dell'ostacolo, non addosso
+            float room = FreeDistance(origin, dir, spawnMaxDistance) - Clearance * 1.2f;
+            float dist = Mathf.Min(wanted, room);
+
+            if (dist < spawnAbsoluteMinDistance) { tooTight++; continue; }
+
+            Vector3 pos = origin + (Vector3)(dir * dist);
+            if (!IsFree(pos)) { occupied++; continue; }   // di solito un altro nemico appena creato
+
+            if (dist >= spawnMinDistance)
             {
                 if (logSpawns)
-                    Debug.LogWarning($"[Spawn] SENZA linea d'aria, {Vector2.Distance(pos, pl.position):F1} unita: separato dal player da un muro");
+                    Debug.Log($"[Spawn] {dist:F1} unita dal player, direzione libera (tentativo {i + 1})");
                 return pos;
             }
+
+            // direzione stretta: si tiene da parte la migliore e si continua a cercarne una piena
+            if (dist > bestDist) { bestDist = dist; best = pos; }
         }
 
-        // 4) ultimo ripiego: appena fuori dal raggio d'azione del player.
-        //    Meglio di Vector3.zero, che accatastava tutti i nemici nello stesso
-        //    punto della mappa, spesso dentro un muro.
-        Debug.LogWarning("[LevelManager] Nessuna posizione libera trovata in "
-                         + (spawnAttempts * 2) + " tentativi: ripiego a distanza minima.");
-        Vector2 dir = UnityEngine.Random.insideUnitCircle.normalized;
-        if (dir == Vector2.zero) dir = Vector2.right;
-        return pl.position + (Vector3)(dir * spawnMinDistance);
+        if (bestDist > 0f)
+        {
+            if (logSpawns)
+                Debug.Log($"[Spawn] nessuna direzione piena: ripiego a {bestDist:F1} unita "
+                          + $"({tooTight} direzioni troppo strette, {occupied} punti occupati)");
+            return best;
+        }
+
+        // 2) niente ha funzionato: il giocatore e' chiuso in uno spazio minuscolo.
+        //    Si prende comunque il punto piu' lontano possibile, sotto il minimo.
+        Vector3 last = FurthestFreePointAround(origin);
+        Debug.LogWarning($"[LevelManager] Spazio troppo stretto attorno al giocatore: "
+                         + $"nemico a {Vector2.Distance(last, origin):F1} unita "
+                         + $"({tooTight} direzioni strette, {occupied} occupate su {Attempts} tentativi).");
+        return last;
     }
 
     /// <summary>
-    /// Ricava l'area giocabile dal Tilemap del terreno. Se non ne trova, il
-    /// vincolo resta disattivato e il comportamento e' quello di prima.
+    /// Il punto va bene se e' dentro l'area, libero da collider e non separato
+    /// dal player da un ostacolo. Serve per gli spawn point messi a mano, dove
+    /// la posizione e' data e va solo verificata.
+    /// </summary>
+    private bool Acceptable(Vector3 pos, Transform pl)
+    {
+        if (!InsideArea(pos)) return false;
+        if (!IsFree(pos)) return false;
+        if (pl != null && BlockedBetween(PlayerBodyPos(), pos)) return false;
+        return true;
+    }
+
+    /// <summary>
+    /// Il centro del collider del giocatore, non l'origine del suo oggetto.
+    ///
+    /// Gli ostacoli sono collider, quindi misurare da un punto che non e' il suo
+    /// collider vuol dire misurare una linea che in gioco non esiste. Sul
+    /// giocatore lo scarto e' 0.26 unita': poco, ma basta a far passare una
+    /// linea sopra un cespuglio che invece lo ferma.
+    /// </summary>
+    private Vector3 PlayerBodyPos()
+    {
+        Transform pl = Player;
+        if (pl == null) return Vector3.zero;
+
+        if (playerCollider == null)
+        {
+            foreach (var c in pl.GetComponentsInChildren<Collider2D>())
+            {
+                if (c != null && !c.isTrigger) { playerCollider = c; break; }
+            }
+        }
+
+        if (playerCollider != null) return playerCollider.bounds.center;
+        return pl.position;
+    }
+
+    /// <summary>
+    /// Quanto si puo' andare lontano da origin in direzione dir prima di
+    /// incontrare un ostacolo o di uscire dall'area giocabile.
+    ///
+    /// Il cast e' un cerchio largo quanto lo spazio che serve al nemico, non una
+    /// linea: cosi un varco troppo stretto per starci non viene contato come
+    /// passaggio libero.
+    /// </summary>
+    private float FreeDistance(Vector3 origin, Vector2 dir, float max)
+    {
+        float reach = max;
+
+        RaycastHit2D[] hits = Physics2D.CircleCastAll(origin, Clearance, dir, max, spawnBlockMask);
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider2D c = hits[i].collider;
+            if (c == null || c.isTrigger) continue;
+            if (IsActor(c)) continue;                  // player e nemici non sono muri
+            if (hits[i].distance < reach) reach = hits[i].distance;
+        }
+
+        return Mathf.Min(reach, DistanceToAreaEdge(origin, dir, max));
+    }
+
+    /// <summary>
+    /// Distanza dal bordo del rettangolo giocabile lungo una direzione.
+    /// </summary>
+    private float DistanceToAreaEdge(Vector3 origin, Vector2 dir, float max)
+    {
+        if (!hasArea) return max;
+
+        float t = max;
+        const float Eps = 0.0001f;
+
+        if (dir.x > Eps) t = Mathf.Min(t, (spawnArea.max.x - origin.x) / dir.x);
+        else if (dir.x < -Eps) t = Mathf.Min(t, (spawnArea.min.x - origin.x) / dir.x);
+
+        if (dir.y > Eps) t = Mathf.Min(t, (spawnArea.max.y - origin.y) / dir.y);
+        else if (dir.y < -Eps) t = Mathf.Min(t, (spawnArea.min.y - origin.y) / dir.y);
+
+        return Mathf.Max(0f, t);
+    }
+
+    /// <summary>
+    /// Ultima spiaggia: prova 16 direzioni fisse e tiene quella dove si arriva
+    /// piu' lontano. Serve solo quando il giocatore e' in uno spazio talmente
+    /// stretto che nemmeno la distanza minima assoluta ci sta.
+    /// </summary>
+    private Vector3 FurthestFreePointAround(Vector3 origin)
+    {
+        const int Directions = 16;
+        float startAngle = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
+
+        Vector3 best = origin;
+        float bestDist = -1f;
+
+        for (int i = 0; i < Directions; i++)
+        {
+            float ang = startAngle + i * (Mathf.PI * 2f / Directions);
+            Vector2 dir = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang));
+
+            float dist = FreeDistance(origin, dir, spawnMaxDistance) - Clearance * 1.2f;
+            if (dist <= 0f) continue;
+
+            Vector3 candidate = origin + (Vector3)(dir * dist);
+            if (!IsFree(candidate)) continue;
+
+            if (dist > bestDist) { bestDist = dist; best = candidate; }
+        }
+
+        if (bestDist < 0f)
+            Debug.LogWarning("[LevelManager] Nessuna direzione libera attorno al giocatore.");
+
+        return best;
+    }
+
+    /// <summary>
+    /// Ricava l'area giocabile. Due sorgenti, e vale l'intersezione:
+    ///
+    /// - i muri, quando la scena ne ha (oggetti che si chiamano Wall...): danno
+    ///   il rettangolo interno esatto in cui si gioca;
+    /// - il Tilemap del terreno, che e' il ripiego per le scene senza muri.
+    ///
+    /// Nella scena Game il Tilemap e' 57x38 unita' mentre i muri ne racchiudono
+    /// 36x22: prendere solo il Tilemap significava dichiarare "area valida" una
+    /// fascia larghissima tutto attorno alla mappa, fuori dai muri. Era la
+    /// causa principale dei nemici comparsi fuori campo.
     /// </summary>
     private void ResolveSpawnArea()
     {
+        Bounds tileRect;
+        Bounds wallRect;
+        bool haveTile = TryTilemapRect(out tileRect);
+        bool haveWall = TryWallRect(out wallRect);
+
+        string source;
+        Bounds area;
+
+        if (haveWall && haveTile)
+        {
+            area = Intersect(wallRect, tileRect);
+            source = "muri + tilemap";
+        }
+        else if (haveWall) { area = wallRect; source = "muri"; }
+        else if (haveTile) { area = tileRect; source = "tilemap"; }
+        else
+        {
+            hasArea = false;
+            Debug.LogWarning("[LevelManager] Nessun muro e nessun Tilemap: area di comparsa non delimitata.");
+            return;
+        }
+
+        area.Expand(-2f * areaMargin);   // Expand somma meta' per lato
+        spawnArea = area;
+        hasArea = spawnArea.size.x > 1f && spawnArea.size.y > 1f;
+
+        if (hasArea)
+            Debug.Log($"[LevelManager] Area di comparsa ({source}): "
+                      + $"x {spawnArea.min.x:F1}..{spawnArea.max.x:F1}, y {spawnArea.min.y:F1}..{spawnArea.max.y:F1}");
+        else
+            Debug.LogWarning("[LevelManager] Area troppo piccola dopo il margine: vincolo disattivato.");
+    }
+
+    private bool TryTilemapRect(out Bounds rect)
+    {
+        rect = new Bounds();
         Tilemap tm = groundTilemap;
         if (tm == null)
         {
@@ -290,28 +510,79 @@ public class LevelManager : MonoBehaviour
                 if (areaSize > best) { best = areaSize; tm = t; }
             }
         }
-
-        if (tm == null)
-        {
-            hasArea = false;
-            Debug.LogWarning("[LevelManager] Nessun Tilemap: i nemici possono comparire ovunque.");
-            return;
-        }
+        if (tm == null) return false;
 
         tm.CompressBounds();
         Bounds lb = tm.localBounds;
         Vector3 centerWorld = tm.transform.TransformPoint(lb.center);
         Vector3 sizeWorld = Vector3.Scale(lb.size, tm.transform.lossyScale);
+        sizeWorld.z = 1f;
+        rect = new Bounds(new Vector3(centerWorld.x, centerWorld.y, 0f), sizeWorld);
+        return true;
+    }
 
-        spawnArea = new Bounds(centerWorld, sizeWorld);
-        spawnArea.Expand(-2f * areaMargin);   // si resta dentro il bordo
-        hasArea = spawnArea.size.x > 0f && spawnArea.size.y > 0f;
+    /// <summary>
+    /// Rettangolo interno delimitato dai muri perimetrali. Ogni muro viene
+    /// classificato come orizzontale o verticale in base alla sua forma, e
+    /// spinge dentro il lato corrispondente.
+    /// </summary>
+    private bool TryWallRect(out Bounds rect)
+    {
+        rect = new Bounds();
+        var walls = new List<Collider2D>();
 
-        if (hasArea)
-            Debug.Log($"[LevelManager] Area di comparsa da '{tm.name}': "
-                      + $"x {spawnArea.min.x:F1}..{spawnArea.max.x:F1}, y {spawnArea.min.y:F1}..{spawnArea.max.y:F1}");
-        else
-            Debug.LogWarning("[LevelManager] Area troppo piccola dopo il margine: vincolo disattivato.");
+        foreach (var c in FindObjectsByType<Collider2D>(FindObjectsSortMode.None))
+        {
+            if (c == null || c.isTrigger || !c.enabled) continue;
+            Transform t = c.transform;
+            bool isWall = t.name.StartsWith("Wall")
+                          || (t.parent != null && t.parent.name.StartsWith("Wall"));
+            if (isWall) walls.Add(c);
+        }
+
+        if (walls.Count < 3) return false;
+
+        Bounds outer = walls[0].bounds;
+        for (int i = 1; i < walls.Count; i++) outer.Encapsulate(walls[i].bounds);
+
+        float left = outer.min.x, right = outer.max.x;
+        float bottom = outer.min.y, top = outer.max.y;
+
+        foreach (var c in walls)
+        {
+            Bounds b = c.bounds;
+            if (b.size.x >= b.size.y)
+            {
+                if (b.center.y > outer.center.y) top = Mathf.Min(top, b.min.y);
+                else bottom = Mathf.Max(bottom, b.max.y);
+            }
+            else
+            {
+                if (b.center.x > outer.center.x) right = Mathf.Min(right, b.min.x);
+                else left = Mathf.Max(left, b.max.x);
+            }
+        }
+
+        if (right - left < 2f || top - bottom < 2f) return false;
+
+        rect = new Bounds(
+            new Vector3((left + right) * 0.5f, (bottom + top) * 0.5f, 0f),
+            new Vector3(right - left, top - bottom, 1f));
+        return true;
+    }
+
+    private static Bounds Intersect(Bounds a, Bounds b)
+    {
+        float minX = Mathf.Max(a.min.x, b.min.x);
+        float maxX = Mathf.Min(a.max.x, b.max.x);
+        float minY = Mathf.Max(a.min.y, b.min.y);
+        float maxY = Mathf.Min(a.max.y, b.max.y);
+
+        if (maxX <= minX || maxY <= minY) return a;   // non si toccano: si tiene il piu' affidabile
+
+        return new Bounds(
+            new Vector3((minX + maxX) * 0.5f, (minY + maxY) * 0.5f, 0f),
+            new Vector3(maxX - minX, maxY - minY, 1f));
     }
 
     private bool InsideArea(Vector3 pos)
@@ -321,21 +592,14 @@ public class LevelManager : MonoBehaviour
             && pos.y >= spawnArea.min.y && pos.y <= spawnArea.max.y;
     }
 
-    private Vector3 RandomRingPoint(Vector3 center)
-    {
-        float ang = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
-        float r = UnityEngine.Random.Range(spawnMinDistance, spawnMaxDistance);
-        return center + new Vector3(Mathf.Cos(ang) * r, Mathf.Sin(ang) * r, 0f);
-    }
 
     /// <summary>
-    /// Libero = nessun collider solido nel raggio. La versione precedente guardava
-    /// solo il primo collider trovato, quindi un trigger davanti a un muro faceva
-    /// passare per buona una posizione dentro il muro.
+    /// Libero = nessun collider solido nel raggio, compresi gli altri nemici:
+    /// due nemici sovrapposti si spingono a vicenda e finiscono dentro i muri.
     /// </summary>
     private bool IsFree(Vector3 pos)
     {
-        Collider2D[] cols = Physics2D.OverlapCircleAll(pos, spawnClearance, spawnBlockMask);
+        Collider2D[] cols = Physics2D.OverlapCircleAll(pos, Clearance, spawnBlockMask);
         for (int i = 0; i < cols.Length; i++)
         {
             Collider2D c = cols[i];
@@ -345,6 +609,11 @@ public class LevelManager : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// C'e' un ostacolo fisso tra i due punti? Player e nemici non contano:
+    /// sono corpi che si spostano, non muri, e considerarli avrebbe scartato
+    /// meta' dei punti buoni solo perche' un altro nemico passava di li'.
+    /// </summary>
     private bool BlockedBetween(Vector3 a, Vector3 b)
     {
         RaycastHit2D[] hits = Physics2D.LinecastAll(a, b, spawnBlockMask);
@@ -352,10 +621,17 @@ public class LevelManager : MonoBehaviour
         {
             Collider2D c = hits[i].collider;
             if (c == null || c.isTrigger) continue;
-            if (playerTransform != null && c.transform == playerTransform) continue;
+            if (IsActor(c)) continue;
             return true;
         }
         return false;
+    }
+
+    /// Player e nemici hanno un Rigidbody2D dinamico; muri, rocce e tilemap no.
+    private static bool IsActor(Collider2D c)
+    {
+        var rb = c.attachedRigidbody;
+        return rb != null && rb.bodyType == RigidbodyType2D.Dynamic;
     }
 
     private void ApplyDifficulty(GameObject enemy)
@@ -372,10 +648,12 @@ public class LevelManager : MonoBehaviour
     private void OnDrawGizmosSelected()
     {
         Transform pl = Application.isPlaying ? playerTransform : null;
-        if (pl == null) return;
-        Gizmos.color = Color.green;
-        Gizmos.DrawWireSphere(pl.position, spawnMinDistance);
-        Gizmos.DrawWireSphere(pl.position, spawnMaxDistance);
+        if (pl != null)
+        {
+            Gizmos.color = Color.green;
+            Gizmos.DrawWireSphere(pl.position, spawnMinDistance);
+            Gizmos.DrawWireSphere(pl.position, spawnMaxDistance);
+        }
         if (hasArea)
         {
             Gizmos.color = Color.cyan;

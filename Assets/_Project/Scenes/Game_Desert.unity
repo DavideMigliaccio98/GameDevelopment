@@ -2026,7 +2026,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
   maxHP: 150
   flashColor: {r: 1, g: 0.3, b: 0.3, a: 1}
-  flashDuration: 0.12
+  flashBlinks: 3
+  flashBlinkTime: 0.09
+  knockbackForce: 3.5
+  knockbackTime: 0.1
 --- !u!1 &535356974
 GameObject:
   m_ObjectHideFlags: 0
@@ -2066,7 +2069,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
-  m_BackGroundColor: {r: 0.8235294, g: 0.7058824, b: 0.39215687, a: 1}
+  m_BackGroundColor: {r: 0.9254902, g: 0.8352941, b: 0.6784314, a: 1}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -2681,13 +2684,16 @@ MonoBehaviour:
   delayBeforeFirstWave: 2
   spawnMinDistance: 7
   spawnMaxDistance: 12
+  spawnAbsoluteMinDistance: 4.5
   spawnClearance: 0.45
   spawnAttempts: 30
-  requireLineOfSight: 1
   spawnBlockMask:
     serializedVersion: 2
     m_Bits: 4294967295
   spawnJitter: 1.2
+  logSpawns: 0
+  groundTilemap: {fileID: 0}
+  areaMargin: 1.5
 --- !u!4 &649763606
 Transform:
   m_ObjectHideFlags: 0
@@ -3006,6 +3012,7 @@ MonoBehaviour:
   maxAlpha: 0.75
   period: 1.1
   scalePulse: 0.06
+  extraOffset: {x: 0, y: 0}
   warningSeconds: 3
   warningPeriod: 0.35
 --- !u!212 &793758769
@@ -3066,7 +3073,7 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_SpriteSortPoint: 0
+  m_SpriteSortPoint: 1
 --- !u!1 &794603759
 GameObject:
   m_ObjectHideFlags: 0
@@ -3143,7 +3150,7 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_SpriteSortPoint: 0
+  m_SpriteSortPoint: 1
 --- !u!4 &794603761
 Transform:
   m_ObjectHideFlags: 0
@@ -3931,6 +3938,8 @@ MonoBehaviour:
   hpBar: {fileID: 1897269332}
   scoreText: {fileID: 109412447}
   player: {fileID: 492128401}
+  hpDamageTint: {r: 1, g: 0.95, b: 0.75, a: 1}
+  hpFlashTime: 0.22
 --- !u!4 &1130690738
 Transform:
   m_ObjectHideFlags: 0

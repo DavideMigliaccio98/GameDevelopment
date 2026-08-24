@@ -13,7 +13,18 @@ public class EnemyHealth : MonoBehaviour
     [SerializeField] private Color flashColor = new Color(1f, 0.3f, 0.3f);
     [SerializeField] private float flashDuration = 0.1f;
 
+    [Header("Morte")]
+    [Tooltip("Quanto resta in scena il corpo dopo la morte, per far vedere le particelle.")]
+    [SerializeField] private float corpseTime = 0.3f;
+
     public int CurrentHP { get; private set; }
+
+    /// <summary>
+    /// Vero dall'istante esatto in cui gli HP arrivano a zero, non da quando
+    /// l'oggetto viene distrutto: tra le due cose passano dei decimi di secondo.
+    /// </summary>
+    public bool IsDead => isDead;
+
     public event Action OnDied;
 
     private Animator anim;
@@ -52,21 +63,53 @@ public class EnemyHealth : MonoBehaviour
         if (CurrentHP <= 0) Die();
     }
 
+    /// <summary>
+    /// Morte del nemico.
+    ///
+    /// L'oggetto non sparisce subito: resta in scena qualche decimo di secondo
+    /// per far vedere le particelle. Prima quei decimi erano tempo di gioco
+    /// pieno, con EnemyController ancora attivo: un nemico ucciso col colpo che
+    /// arrivava per primo faceva comunque in tempo a colpire, e il danno
+    /// sembrava piovere dal nulla perche' il colpevole nel frattempo era gia'
+    /// scomparso.
+    ///
+    /// Adesso alla morte il nemico viene spento del tutto: niente movimento,
+    /// niente attacchi, niente collisioni. Resta solo il corpo da guardare.
+    /// </summary>
     private void Die()
     {
+        isDead = true;
+
         if (deathParticlesPrefab != null)
         {
             Vector3 spawnPos = transform.position + Vector3.up * 0.5f;
             Instantiate(deathParticlesPrefab, spawnPos, Quaternion.identity);
         }
-        isDead = true;
 
-        // SFX morte nemico
+        // 1) niente piu' attacchi ne' inseguimento
+        var controller = GetComponent<EnemyController>();
+        if (controller != null) controller.enabled = false;
+
+        // 2) il corpo non deve scivolare ne' spingere nessuno
+        var rb = GetComponent<Rigidbody2D>();
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+            rb.simulated = false;
+        }
+
+        // 3) e non deve fare da ostacolo per gli ultimi decimi di vita
+        foreach (var col in GetComponentsInChildren<Collider2D>())
+            if (col != null) col.enabled = false;
+
+        if (anim != null) anim.SetBool("isMoving", false);
+
         if (AudioManager.Instance != null) AudioManager.Instance.PlayEnemyDeath();
 
         if (GameManager.Instance != null) GameManager.Instance.AddScore(scoreOnDeath);
         OnDied?.Invoke();
-        Destroy(gameObject, 0.3f);
+        Destroy(gameObject, corpseTime);
     }
 
     /// <summary>

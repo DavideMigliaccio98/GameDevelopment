@@ -2713,7 +2713,7 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_SpriteSortPoint: 0
+  m_SpriteSortPoint: 1
 --- !u!4 &1084717247
 Transform:
   m_ObjectHideFlags: 0
@@ -3325,7 +3325,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
   maxHP: 150
   flashColor: {r: 1, g: 0.3, b: 0.3, a: 1}
-  flashDuration: 0.12
+  flashBlinks: 3
+  flashBlinkTime: 0.09
+  knockbackForce: 3.5
+  knockbackTime: 0.1
 --- !u!114 &1377674627
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3750,7 +3753,7 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_SpriteSortPoint: 0
+  m_SpriteSortPoint: 1
 --- !u!4 &1523968202
 Transform:
   m_ObjectHideFlags: 0
@@ -6552,7 +6555,7 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_SpriteSortPoint: 0
+  m_SpriteSortPoint: 1
 --- !u!4 &1805849212
 Transform:
   m_ObjectHideFlags: 0
@@ -6665,6 +6668,7 @@ MonoBehaviour:
   maxAlpha: 0.75
   period: 1.1
   scalePulse: 0.06
+  extraOffset: {x: 0, y: 0}
   warningSeconds: 3
   warningPeriod: 0.35
 --- !u!212 &1909820596
@@ -6725,7 +6729,7 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_SpriteSortPoint: 0
+  m_SpriteSortPoint: 1
 --- !u!1 &1915460863
 GameObject:
   m_ObjectHideFlags: 0
@@ -6761,6 +6765,8 @@ MonoBehaviour:
   hpBar: {fileID: 1383547068}
   scoreText: {fileID: 1126051377}
   player: {fileID: 0}
+  hpDamageTint: {r: 1, g: 0.95, b: 0.75, a: 1}
+  hpFlashTime: 0.22
 --- !u!114 &1915460865
 MonoBehaviour:
   m_ObjectHideFlags: 0

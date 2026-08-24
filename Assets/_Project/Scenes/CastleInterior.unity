@@ -1057,6 +1057,7 @@ MonoBehaviour:
   maxAlpha: 0.75
   period: 1.1
   scalePulse: 0.06
+  extraOffset: {x: 0, y: 0}
   warningSeconds: 3
   warningPeriod: 0.35
 --- !u!212 &444644736
@@ -1117,7 +1118,7 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_SpriteSortPoint: 0
+  m_SpriteSortPoint: 1
 --- !u!1 &460551820
 GameObject:
   m_ObjectHideFlags: 0
@@ -2818,6 +2819,8 @@ MonoBehaviour:
   hpBar: {fileID: 1962060895}
   scoreText: {fileID: 1955728383}
   player: {fileID: 0}
+  hpDamageTint: {r: 1, g: 0.95, b: 0.75, a: 1}
+  hpFlashTime: 0.22
 --- !u!1 &891603919
 GameObject:
   m_ObjectHideFlags: 0
@@ -2895,7 +2898,7 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_SpriteSortPoint: 0
+  m_SpriteSortPoint: 1
 --- !u!4 &891603921
 Transform:
   m_ObjectHideFlags: 0
@@ -3072,7 +3075,7 @@ Transform:
   m_GameObject: {fileID: 1064434154}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.09, y: -3.85, z: 0}
+  m_LocalPosition: {x: 0.09, y: -3.97, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3154,7 +3157,7 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_SpriteSortPoint: 0
+  m_SpriteSortPoint: 1
 --- !u!4 &1084717247
 Transform:
   m_ObjectHideFlags: 0
@@ -3784,7 +3787,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
   maxHP: 150
   flashColor: {r: 1, g: 0.3, b: 0.3, a: 1}
-  flashDuration: 0.12
+  flashBlinks: 3
+  flashBlinkTime: 0.09
+  knockbackForce: 3.5
+  knockbackTime: 0.1
 --- !u!114 &1377674627
 MonoBehaviour:
   m_ObjectHideFlags: 0

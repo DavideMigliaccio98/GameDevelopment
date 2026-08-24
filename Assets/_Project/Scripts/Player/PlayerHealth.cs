@@ -7,8 +7,18 @@ public class PlayerHealth : MonoBehaviour
     [SerializeField] private int maxHP = 100;
 
     [Header("Feedback danno")]
-    [SerializeField] private Color flashColor = new Color(1f, 0.3f, 0.3f);
-    [SerializeField] private float flashDuration = 0.12f;
+    [SerializeField] private Color flashColor = new Color(1f, 0.25f, 0.25f);
+    [Tooltip("Numero di lampeggi. Uno solo, com'era prima, su schermo piccolo non si vede.")]
+    [SerializeField] private int flashBlinks = 3;
+    [Tooltip("Durata di un singolo lampeggio (acceso + spento).")]
+    [SerializeField] private float flashBlinkTime = 0.09f;
+
+    [Header("Spinta")]
+    [Tooltip("Quanto il giocatore viene respinto dal nemico che lo colpisce. " +
+             "Tenerlo basso: una spinta forte ti sbatte fuori dalla portata della " +
+             "tua stessa spada a ogni colpo incassato, e non riesci piu' a combattere.")]
+    [SerializeField] private float knockbackForce = 3.5f;
+    [SerializeField] private float knockbackTime = 0.1f;
 
     public int CurrentHP { get; private set; }
     public int MaxHP => maxHP;
@@ -18,6 +28,7 @@ public class PlayerHealth : MonoBehaviour
     public event Action OnDied;
 
     private SpriteRenderer sr;
+    private PlayerController controller;
 
     // Il colore normale si legge UNA volta all'avvio. Leggerlo dentro la coroutine
     // significava, al secondo colpo ravvicinato, fotografare il rosso del colpo
@@ -27,9 +38,9 @@ public class PlayerHealth : MonoBehaviour
 
     private void Awake()
     {
-        // FIX: assegna lo SpriteRenderer (era null -> flash non partiva mai)
-        sr = GetComponentInChildren<SpriteRenderer>();
+        sr = FindBodyRenderer();
         if (sr != null) baseColor = sr.color;
+        controller = GetComponent<PlayerController>();
 
         if (GameManager.Instance != null && GameManager.Instance.LastPlayerHP > 0)
         {
@@ -42,6 +53,28 @@ public class PlayerHealth : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Lo sprite del personaggio, non quello dell'alone del potenziamento:
+    /// sono entrambi figli del Player e prendere il primo che capita
+    /// significherebbe, a volte, far lampeggiare l'alone al posto del corpo.
+    /// </summary>
+    private SpriteRenderer FindBodyRenderer()
+    {
+        Transform visual = transform.Find("Visual");
+        if (visual != null)
+        {
+            var v = visual.GetComponent<SpriteRenderer>();
+            if (v != null) return v;
+        }
+
+        foreach (var candidate in GetComponentsInChildren<SpriteRenderer>(true))
+        {
+            if (candidate.GetComponent<BoostAura>() != null) continue;
+            return candidate;
+        }
+        return null;
+    }
+
     private void Start()
     {
         OnHpChanged?.Invoke(CurrentHP, maxHP);
@@ -49,14 +82,29 @@ public class PlayerHealth : MonoBehaviour
 
     public void TakeDamage(int dmg)
     {
+        TakeDamage(dmg, transform.position);
+    }
+
+    /// <summary>
+    /// sourcePos serve per capire da che parte e' arrivato il colpo e spingere
+    /// il giocatore dalla parte opposta.
+    /// </summary>
+    public void TakeDamage(int dmg, Vector2 sourcePos)
+    {
         if (IsDead) return;
         CurrentHP = Mathf.Max(0, CurrentHP - dmg);
         OnHpChanged?.Invoke(CurrentHP, maxHP);
 
-        // Feedback visivo + sonoro
         Flash();
         if (AudioManager.Instance != null) AudioManager.Instance.PlayPlayerHurt();
-        if (CameraShake.Instance != null) CameraShake.Instance.Shake(0.15f, 0.12f);
+
+        // Bordo rosso, micro-fermo immagine, scossa e vibrazione: sono i segnali
+        // che si notano su un telefono, dove il personaggio e' piccolo e spesso
+        // coperto dal pollice.
+        float severity = maxHP > 0 ? (float)dmg / maxHP : 0.5f;
+        DamageFeedback.Ensure().PlayerHit(severity * 3f);   // 1/3 della vita = colpo pieno
+
+        Knockback(sourcePos);
 
         Debug.Log($"Player HP: {CurrentHP}/{maxHP}");
 
@@ -79,6 +127,16 @@ public class PlayerHealth : MonoBehaviour
         }
     }
 
+    private void Knockback(Vector2 sourcePos)
+    {
+        if (controller == null || knockbackForce <= 0f) return;
+
+        Vector2 away = (Vector2)transform.position - sourcePos;
+        if (away.sqrMagnitude < 0.0001f) return;   // colpo senza direzione: niente spinta
+
+        controller.ApplyKnockback(away.normalized, knockbackForce, knockbackTime);
+    }
+
     /// <summary>
     /// Un solo lampeggio alla volta: un colpo che arriva mentre il precedente e'
     /// ancora in corso lo fa ripartire da capo invece di accodarsi.
@@ -92,8 +150,18 @@ public class PlayerHealth : MonoBehaviour
 
     private IEnumerator FlashRed()
     {
-        sr.color = flashColor;
-        yield return new WaitForSeconds(flashDuration);
+        int blinks = Mathf.Max(1, flashBlinks);
+        float half = Mathf.Max(0.01f, flashBlinkTime * 0.5f);
+
+        for (int i = 0; i < blinks; i++)
+        {
+            sr.color = flashColor;
+            // tempo non scalato: il micro-fermo immagine non deve allungare il lampeggio
+            yield return new WaitForSecondsRealtime(half);
+            sr.color = baseColor;
+            if (i < blinks - 1) yield return new WaitForSecondsRealtime(half);
+        }
+
         sr.color = baseColor;
         flashRoutine = null;
     }

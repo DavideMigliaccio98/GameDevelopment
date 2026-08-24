@@ -8,6 +8,12 @@ public class MainMenuUI : MonoBehaviour
 
     private void Start()
     {
+        // Rete di sicurezza: al menu principale ci si arriva da bottoni diversi
+        // (pausa, game over, livello completato) e basta che uno solo si
+        // dimentichi di chiudere la partita perche' il punteggio se lo porti
+        // dietro. Qui vale sempre, comunque ci si sia arrivati.
+        if (GameManager.Instance != null) GameManager.Instance.EndRun();
+
         if (PlayFabAuth.IsLoggedIn && playerIdText != null)
         {
             string nameToShow;

@@ -71,14 +71,14 @@ public class GameOverHandler : MonoBehaviour
     public void OnRetry()
     {
         Time.timeScale = 1f;
-        if (GameManager.Instance != null) GameManager.Instance.ResetScore();
+        if (GameManager.Instance != null) GameManager.Instance.EndRun();
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
     public void OnBackToMenu()
     {
         Time.timeScale = 1f;
-        if (GameManager.Instance != null) GameManager.Instance.ResetScore();
+        if (GameManager.Instance != null) GameManager.Instance.EndRun();
         SceneManager.LoadScene("MainMenu");
     }
 }

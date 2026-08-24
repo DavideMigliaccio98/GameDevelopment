@@ -46,7 +46,10 @@ public static class OakheartBatch
             "  - skin pixel-art dell'HUD\n" +
             "  - skin dei pannelli Livello completato e Game over\n" +
             "  - battute NPC aggiornate negli interni\n" +
-            "  - alone del potenziamento sul Player\n\n" +
+            "  - alone del potenziamento sul Player\n" +
+            "  - collider alla base delle rocce\n" +
+            "  - ordinamento per profondita' (asse Y, pivot)\n\n" +
+            "Prefab Enemy: hitbox riportata ai piedi (era sopra la testa).\n\n" +
             "MainMenu, Login e Boot (" + ScalerOnlyScenes.Length + "):\n" +
             "  - Canvas Scaler\n" +
             "  - rimozione del bottone di debug " + DevButtonName + "\n" +
@@ -73,9 +76,14 @@ public static class OakheartBatch
         OakheartPanelSkin.Silent = true;
         OakheartMenuSkin.Silent = true;
         OakheartBoostAura.Silent = true;
+        OakheartColliders.Silent = true;
+        OakheartDepth.Silent = true;
 
         try
         {
+            // Il nemico e' un prefab, non sta in una scena: si sistema una volta sola.
+            OakheartColliders.EnemyHitbox();
+
             for (int i = 0; i < FullScenes.Length; i++)
             {
                 EditorUtility.DisplayProgressBar("Oakheart - batch",
@@ -97,6 +105,8 @@ public static class OakheartBatch
             OakheartPanelSkin.Silent = false;
             OakheartMenuSkin.Silent = false;
             OakheartBoostAura.Silent = false;
+            OakheartColliders.Silent = false;
+            OakheartDepth.Silent = false;
             EditorUtility.ClearProgressBar();
 
             if (!string.IsNullOrEmpty(original))
@@ -149,6 +159,16 @@ public static class OakheartBatch
 
                 OakheartBoostAura.CreateOnPlayer();
                 notes.Add("aura");
+
+                // Le rocce erano solo disegno: senza collider i nemici ci
+                // comparivano dentro e dietro.
+                OakheartColliders.DecorationColliders();
+                notes.Add("rocce");
+
+                // Ordine di disegno per profondita': senza, chi finisce davanti
+                // e chi dietro lo decideva il caso.
+                OakheartDepth.ApplyActive();
+                notes.Add("profondita");
             }
             else
             {

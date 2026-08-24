@@ -38,6 +38,29 @@ public class GameManager : MonoBehaviour
         OnScoreChanged?.Invoke(Score);
     }
 
+    /// <summary>
+    /// Chiude la partita in corso: punteggio a zero, vita da rigenerare al
+    /// massimo, potenziamento scaduto.
+    ///
+    /// Serve un punto unico perche' al menu principale ci si arriva da tre
+    /// bottoni diversi (pausa, game over, livello completato) e ognuno faceva
+    /// storia a se': da "livello completato" il punteggio non veniva azzerato
+    /// affatto, e la vita residua restava memorizzata in LastPlayerHP, quindi
+    /// la partita successiva partiva con gli HP di quella vecchia.
+    ///
+    /// Viene chiamato anche all'apertura del menu principale, cosi vale
+    /// qualunque strada si sia presa per arrivarci.
+    /// </summary>
+    public void EndRun()
+    {
+        Score = 0;
+        LastPlayerHP = -1;
+        LastPlayerMaxHP = -1;
+        ClearBoost();
+        OnScoreChanged?.Invoke(Score);
+        Debug.Log("[GameManager] Partita chiusa: punteggio, vita e potenziamento azzerati.");
+    }
+
     public void ClearBoost()
     {
         BoostEndTime = 0f;

@@ -35,7 +35,7 @@ public class PauseManager : MonoBehaviour
     public void BackToMenu()
     {
         Time.timeScale = 1f; // ripristina il timeScale prima del cambio scena
-        if (GameManager.Instance != null) GameManager.Instance.ResetScore();
+        if (GameManager.Instance != null) GameManager.Instance.EndRun();
         SceneManager.LoadScene("MainMenu");
     }
 }

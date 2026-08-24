@@ -157,7 +157,7 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 1}
+  m_Offset: {x: 0.05, y: 0.85}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0}
@@ -167,7 +167,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 0.4, y: 0.6}
+  m_Size: {x: 0.55, y: 0.6}
   m_EdgeRadius: 0
 --- !u!95 &6406181065408232746
 Animator:
@@ -206,6 +206,8 @@ MonoBehaviour:
   maxHP: 5
   scoreOnDeath: 10
   deathParticlesPrefab: {fileID: 3066608409103098000, guid: f1af95c0a62a77d4fa11ec87168a8bc4, type: 3}
+  flashColor: {r: 1, g: 0.3, b: 0.3, a: 1}
+  flashDuration: 0.1
 --- !u!114 &308896252251214543
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -223,3 +225,8 @@ MonoBehaviour:
   attackRange: 0.8
   damage: 3
   attackCooldown: 1.2
+  obstacleMask:
+    serializedVersion: 2
+    m_Bits: 1
+  probeDistance: 0.7
+  probeRadius: 0.22

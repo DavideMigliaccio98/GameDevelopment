@@ -80,7 +80,7 @@ public class LevelCompleteUI : MonoBehaviour
     public void OnEndless()
     {
         Time.timeScale = 1f;
-        if (GameManager.Instance != null) GameManager.Instance.ResetScore();
+        if (GameManager.Instance != null) GameManager.Instance.EndRun();
         // assegna il LevelData Endless (lo passiamo via SelectedLevel)
         var endless = Resources.Load<LevelData>("LevelEndless");
         if (endless == null)
@@ -121,6 +121,8 @@ public class LevelCompleteUI : MonoBehaviour
             return;
         }
 
+        // Passando al livello successivo il punteggio si accumula di proposito
+        // (e' la stessa partita), ma la vita salvata va ripulita solo alla fine.
         int currentNum = SelectedLevel.Current.levelNumber;
         int nextNum = currentNum + 1;
 
@@ -152,8 +154,9 @@ public class LevelCompleteUI : MonoBehaviour
     public void OnBackToMenu()
     {
         Time.timeScale = 1f;
-        // se vuoi resettare lo score quando torni al menu, decommenta:
-        // if (GameManager.Instance != null) GameManager.Instance.ResetScore();
+        // Tornare al menu chiude la partita: il punteggio accumulato nei livelli
+        // precedenti non deve ricomparire nella partita dopo.
+        if (GameManager.Instance != null) GameManager.Instance.EndRun();
         SceneManager.LoadScene("MainMenu");
     }
 }

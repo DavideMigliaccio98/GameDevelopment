@@ -638,7 +638,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
-  m_BackGroundColor: {r: 0.23529412, g: 0.39215687, b: 0.15686275, a: 1}
+  m_BackGroundColor: {r: 0, g: 0, b: 0, a: 1}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -779,7 +779,7 @@ Transform:
   m_GameObject: {fileID: 444644733}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.385, z: 0}
+  m_LocalPosition: {x: -0.02000001, y: 0.385, z: 0}
   m_LocalScale: {x: 1.5875, y: 1.5875, z: 1.5875}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -803,6 +803,7 @@ MonoBehaviour:
   maxAlpha: 0.75
   period: 1.1
   scalePulse: 0.06
+  extraOffset: {x: 0, y: 0}
   warningSeconds: 3
   warningPeriod: 0.35
 --- !u!212 &444644736
@@ -863,7 +864,7 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_SpriteSortPoint: 0
+  m_SpriteSortPoint: 1
 --- !u!1 &460551820
 GameObject:
   m_ObjectHideFlags: 0
@@ -2441,6 +2442,8 @@ MonoBehaviour:
   hpBar: {fileID: 1133782785}
   scoreText: {fileID: 498548976}
   player: {fileID: 0}
+  hpDamageTint: {r: 1, g: 0.95, b: 0.75, a: 1}
+  hpFlashTime: 0.22
 --- !u!114 &880452149
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3112,7 +3115,7 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0, y: 0}
+  m_Offset: {x: 0, y: -0.34002256}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0, y: 0}
@@ -3122,7 +3125,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 2, y: 1}
+  m_Size: {x: 1.039938, y: 0.63997746}
   m_EdgeRadius: 0
 --- !u!4 &1064434157
 Transform:
@@ -3215,7 +3218,7 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_SpriteSortPoint: 0
+  m_SpriteSortPoint: 1
 --- !u!4 &1084717247
 Transform:
   m_ObjectHideFlags: 0
@@ -3586,7 +3589,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerHealth
   maxHP: 150
   flashColor: {r: 1, g: 0.3, b: 0.3, a: 1}
-  flashDuration: 0.12
+  flashBlinks: 3
+  flashBlinkTime: 0.09
+  knockbackForce: 3.5
+  knockbackTime: 0.1
 --- !u!114 &1377674627
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3865,7 +3871,7 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
-  m_SpriteSortPoint: 0
+  m_SpriteSortPoint: 1
 --- !u!4 &1497749556
 Transform:
   m_ObjectHideFlags: 0
