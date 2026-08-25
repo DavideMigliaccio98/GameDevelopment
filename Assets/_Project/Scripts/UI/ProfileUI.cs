@@ -31,6 +31,14 @@ public class ProfileUI : MonoBehaviour
     [Header("Chiusura")]
     [SerializeField] private Button closeButton;
 
+    [Header("Titolo sopra il pannello")]
+    [Tooltip("Spazio minimo tra il fondo del titolo e la targhetta del pannello.")]
+    [SerializeField] private float titleGap = 90f;
+    [Tooltip("Quanto puo' salire al massimo il titolo, misurato dal bordo alto.")]
+    [SerializeField] private float titleTopMargin = 40f;
+
+    private static readonly string[] TitlePlates = { "PRPlate", "PRTitle", "PRBox" };
+
     private const int NameMinLength = 3;
     private const int NameMaxLength = 25;
 
@@ -62,6 +70,10 @@ public class ProfileUI : MonoBehaviour
         gameObject.SetActive(true);      // fa partire Awake, che aggancia i bottoni
         SetStatus("", false);
 
+        // Stesso trattamento della selezione livelli: il pannello e' a schermo
+        // intero e coprirebbe il titolo del gioco.
+        MenuTitleLift.Raise(transform, TitlePlates, titleGap, titleTopMargin);
+
         if (nameInput != null)
         {
             nameInput.text = PlayFabAuth.DisplayName ?? "";
@@ -81,6 +93,7 @@ public class ProfileUI : MonoBehaviour
 
     public void Hide()
     {
+        MenuTitleLift.Restore();
         gameObject.SetActive(false);
     }
 
@@ -165,7 +178,7 @@ public class ProfileUI : MonoBehaviour
 
         if (string.IsNullOrEmpty(email))
         {
-            SetStatus("No email on this account. Sign in with email to change the password.", true);
+            SetStatus("No email on this account.\nSign in with email to change it.", true);
             return;
         }
 
@@ -175,7 +188,7 @@ public class ProfileUI : MonoBehaviour
         PlayFabAuth.SendPasswordReset(email, (ok, code, message) =>
         {
             SetButtons(true);
-            if (ok) SetStatus($"We sent a link to {Mask(email)}. Open it to set a new password.", false);
+            if (ok) SetStatus($"Reset link sent to\n{Mask(email)}", false);
             else SetStatus(message, true);
         });
     }
@@ -205,11 +218,17 @@ public class ProfileUI : MonoBehaviour
         var sb = new StringBuilder();
         sb.Append("Best score: ").Append(bestScore).Append('\n');
 
-        // max_level_unlocked e' "il piu' alto sbloccato": i livelli finiti sono
-        // quelli prima di quello. Con 99 addosso dal bottone di sviluppo il conto
-        // sballerebbe, quindi si limita al numero di livelli che esistono.
-        int completed = Mathf.Clamp(maxLevel - 1, 0, 5);
-        sb.Append("Levels completed: ").Append(completed).Append(" / 5\n");
+        // Stessa parola e stesso numero della selezione livelli.
+        //
+        // Prima qui c'era "Levels completed", cioe' maxLevel - 1: con cinque
+        // livelli sbloccati usciva 4, che e' pure vero (per aprire il quinto ne
+        // hai finiti quattro) ma non e' il numero che si legge nell'altra
+        // schermata. Due schermate che contano la stessa cosa in modo diverso
+        // sembrano sbagliate anche quando sono entrambe giuste.
+        //
+        // Il limite serve perche' il bottone di sviluppo scriveva 99.
+        int unlocked = Mathf.Clamp(maxLevel, 1, 5);
+        sb.Append("Levels unlocked: ").Append(unlocked).Append(" / 5\n");
 
         sb.Append("Leaderboard: ").Append(rank > 0 ? "#" + rank : "not ranked yet");
 

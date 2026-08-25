@@ -21,12 +21,6 @@ public class LevelSelection : MonoBehaviour
     private int maxUnlocked = 1;
     private bool isLoading = true; // NUOVO: stato caricamento
 
-    // Il titolo del gioco, che sta nel Canvas accanto a questo pannello.
-    private RectTransform title;
-    private int titleOriginalIndex = -1;
-    private Vector2 titleOriginalPos;
-    private bool titleMoved;
-
     [Header("Titolo sopra il pannello")]
     [Tooltip("Spazio minimo tra il fondo del titolo e la targhetta del pannello.")]
     [SerializeField] private float titleGap = 90f;
@@ -50,7 +44,8 @@ public class LevelSelection : MonoBehaviour
         gameObject.SetActive(true);
         if (panel != null) { panel.gameObject.SetActive(true); panel.alpha = 1f; }
 
-        BringTitleForward();
+        MenuTitleLift.Raise(panel != null ? panel.transform : transform,
+                            TitlePlates, titleGap, titleTopMargin, logTitleFit);
 
         if (PlayFabAuth.IsLoggedIn)
         {
@@ -78,175 +73,10 @@ public class LevelSelection : MonoBehaviour
     public void Hide()
     {
         if (panel != null) { panel.alpha = 0f; panel.gameObject.SetActive(false); }
-        RestoreTitle();
+        MenuTitleLift.Restore();
     }
 
-    /// <summary>
-    /// Porta il titolo del gioco davanti al pannello, e se serve lo alza.
-    ///
-    /// Il titolo non spariva: il pannello e' a schermo intero e si porta dietro
-    /// il proprio fondale, quindi lo copriva. Disegnarlo dopo risolve meta' del
-    /// problema.
-    ///
-    /// L'altra meta' e' che il riquadro dei livelli e' centrato in verticale
-    /// mentre il titolo e' ancorato in alto. Su uno schermo alto e stretto come
-    /// il telefono il riquadro sta basso e i due non si toccano; su uno schermo
-    /// piu' tozzo il riquadro sale e ci finisce addosso. Una quota fissa
-    /// funzionerebbe su un formato solo.
-    ///
-    /// Quindi la quota non si sceglie, si misura: si guarda dove comincia
-    /// davvero la targhetta del pannello e si alza il titolo quel tanto che
-    /// serve a stargli sopra, non un pixel di piu'. Sul telefono non si muove
-    /// affatto, perche' li' lo spazio c'e' gia'.
-    /// </summary>
-    private void BringTitleForward()
-    {
-        if (title == null)
-        {
-            Canvas canvas = GetComponentInParent<Canvas>();
-            if (canvas == null) return;
-            Transform found = canvas.transform.Find("Title");
-            title = found as RectTransform;
-            if (title == null) return;
-        }
-
-        if (titleOriginalIndex < 0)
-        {
-            titleOriginalIndex = title.GetSiblingIndex();
-            titleOriginalPos = title.anchoredPosition;
-        }
-
-        title.SetAsLastSibling();
-        LiftTitleAbovePanel();
-        titleMoved = true;
-    }
-
-    /// <summary>
-    /// Alza il titolo finche' il suo TESTO non sta sopra la targhetta del pannello.
-    ///
-    /// La prima versione misurava il riquadro del titolo invece del testo, e il
-    /// riquadro e' 800x250 mentre la scritta ne occupa una sessantina in mezzo.
-    /// Chiedere che stesse sopra la targhetta tutto il riquadro voleva dire
-    /// chiedere uno spostamento enorme, che sbatteva contro il limite in alto e
-    /// si fermava a meta': il testo restava addosso alla targhetta lo stesso.
-    ///
-    /// Qui si misurano i confini reali della scritta, quelli che TextMeshPro
-    /// calcola dopo aver composto le lettere. Il conto e' in coordinate di
-    /// mondo, cosi vale anche se titolo e targhetta hanno ancoraggi diversi,
-    /// che qui e' proprio il caso.
-    /// </summary>
-    private void LiftTitleAbovePanel()
-    {
-        title.anchoredPosition = titleOriginalPos;
-
-        RectTransform plate = FindPanelTop();
-        if (plate == null) return;
-
-        float scale = title.lossyScale.y;
-        if (scale <= 0.0001f) return;
-
-        float textBottom, textTop;
-        MeasureTitle(out textBottom, out textTop);
-
-        var plateCorners = new Vector3[4];
-        plate.GetWorldCorners(plateCorners);
-        float plateTop = plateCorners[1].y;              // angolo in alto a sinistra
-
-        float needed = (plateTop + titleGap * scale) - textBottom;
-        if (needed <= 0f)
-        {
-            if (logTitleFit) Debug.Log("[LevelSelection] Titolo gia' sopra la targhetta: non lo muovo.");
-            return;
-        }
-
-        // Limite: la scritta non deve uscire dal bordo alto dello schermo.
-        float room = float.MaxValue;
-        RectTransform parent = title.parent as RectTransform;
-        if (parent != null)
-        {
-            var parentCorners = new Vector3[4];
-            parent.GetWorldCorners(parentCorners);
-            float canvasTop = parentCorners[1].y;
-            room = (canvasTop - titleTopMargin * scale) - textTop;
-        }
-
-        float applied = Mathf.Min(needed, room);
-        if (applied <= 0f)
-        {
-            if (logTitleFit)
-                Debug.LogWarning($"[LevelSelection] Non c'e' spazio sopra la targhetta: "
-                                 + $"servirebbero {needed / scale:F0}, disponibili {room / scale:F0}.");
-            return;
-        }
-
-        title.anchoredPosition = titleOriginalPos + new Vector2(0f, applied / scale);
-
-        if (logTitleFit)
-            Debug.Log($"[LevelSelection] Titolo alzato di {applied / scale:F0} "
-                      + $"(servivano {needed / scale:F0}, disponibili {room / scale:F0}). "
-                      + $"y da {titleOriginalPos.y:F0} a {title.anchoredPosition.y:F0}.");
-    }
-
-    /// <summary>
-    /// I confini verticali della scritta, non del riquadro che la contiene.
-    /// Se per qualche motivo non si trova il testo si ripiega sul riquadro.
-    /// </summary>
-    private void MeasureTitle(out float bottom, out float top)
-    {
-        TMPro.TMP_Text label = title.GetComponentInChildren<TMPro.TMP_Text>();
-        if (label != null)
-        {
-            label.ForceMeshUpdate();
-            Bounds b = label.textBounds;
-            if (b.size.y > 0.0001f)
-            {
-                bottom = label.transform.TransformPoint(new Vector3(0f, b.min.y, 0f)).y;
-                top = label.transform.TransformPoint(new Vector3(0f, b.max.y, 0f)).y;
-                return;
-            }
-        }
-
-        var corners = new Vector3[4];
-        title.GetWorldCorners(corners);
-        bottom = corners[0].y;
-        top = corners[1].y;
-    }
-
-    /// <summary>
-    /// Il bordo superiore del pannello: la targhetta se c'e', altrimenti il riquadro.
-    /// </summary>
-    private RectTransform FindPanelTop()
-    {
-        Transform root = panel != null ? panel.transform : transform;
-
-        string[] candidates = { "LSPlate", "LSTitle", "LSBox" };
-        for (int i = 0; i < candidates.Length; i++)
-        {
-            Transform t = FindDeep(root, candidates[i]);
-            RectTransform rt = t as RectTransform;
-            if (rt != null) return rt;
-        }
-        return null;
-    }
-
-    private static Transform FindDeep(Transform root, string name)
-    {
-        if (root.name == name) return root;
-        for (int i = 0; i < root.childCount; i++)
-        {
-            Transform found = FindDeep(root.GetChild(i), name);
-            if (found != null) return found;
-        }
-        return null;
-    }
-
-    private void RestoreTitle()
-    {
-        if (title == null || !titleMoved) return;
-        if (titleOriginalIndex >= 0) title.SetSiblingIndex(titleOriginalIndex);
-        title.anchoredPosition = titleOriginalPos;
-        titleMoved = false;
-    }
+    private static readonly string[] TitlePlates = { "LSPlate", "LSTitle", "LSBox" };
 
     private void UpdateButtons()
     {

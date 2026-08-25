@@ -393,9 +393,14 @@ public static class OakheartMenuSkin
         MoveIntoBox(stats, box, 660f, 170f, 3);
         Style(stats.GetComponent<TextMeshProUGUI>(), k.Font, FontRow, DarkWood, TextAlignmentOptions.Center);
 
+        // Alta tre righe e non una: qui ci finiscono anche i messaggi lunghi,
+        // tipo l'indirizzo a cui e' partita l'email di reimpostazione. Con una
+        // riga sola le altre due sparivano sotto il bottone.
+        // L'altezza e' fissa apposta: se crescesse col testo, il pannello
+        // ballerebbe a ogni messaggio.
         Transform status = EnsureLabel(panel, "PRStatusText", "");
-        MoveIntoBox(status, box, 660f, 50f, 4);
-        Style(status.GetComponent<TextMeshProUGUI>(), k.Font, FontStatus, DarkWood, TextAlignmentOptions.Center);
+        MoveIntoBox(status, box, 660f, 130f, 4);
+        Style(status.GetComponent<TextMeshProUGUI>(), k.Font, FontStatus, DarkWood, TextAlignmentOptions.Top);
 
         Transform close = EnsureButton(panel, "PRCloseButton", "BACK");
         SkinBoxButton(close, box, k, false, 5, 420f, 100f);
