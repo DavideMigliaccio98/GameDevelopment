@@ -23,6 +23,41 @@ public static class PlayFabLeaderboard
             e => { Debug.LogError($"[Leaderboard] Errore submit: {e.GenerateErrorReport()}"); onDone?.Invoke(); });
     }
 
+    /// <summary>
+    /// La posizione del giocatore in classifica, contando da 1.
+    /// Restituisce -1 se non ha ancora un punteggio registrato.
+    ///
+    /// Si usa la classifica "attorno al giocatore" invece di scaricare i primi
+    /// N e cercarsi dentro: quella risponde anche se si e' millesimi, mentre la
+    /// lista dei primi dieci direbbe soltanto che non ci si sta.
+    /// </summary>
+    public static void GetMyRank(Action<int, int> onDone)
+    {
+        var request = new GetLeaderboardAroundPlayerRequest
+        {
+            StatisticName = STAT_NAME,
+            MaxResultsCount = 1
+        };
+
+        PlayFabClientAPI.GetLeaderboardAroundPlayer(request,
+            r =>
+            {
+                if (r.Leaderboard == null || r.Leaderboard.Count == 0)
+                {
+                    onDone?.Invoke(-1, 0);
+                    return;
+                }
+
+                PlayerLeaderboardEntry me = r.Leaderboard[0];
+                onDone?.Invoke(me.Position + 1, me.StatValue);   // Position parte da zero
+            },
+            e =>
+            {
+                Debug.LogWarning($"[Leaderboard] Posizione non disponibile: {e.GenerateErrorReport()}");
+                onDone?.Invoke(-1, 0);
+            });
+    }
+
     public static void GetTop(int limit, Action<List<PlayerLeaderboardEntry>> onDone)
     {
         var request = new GetLeaderboardRequest

@@ -44,7 +44,7 @@ public class LevelCompleteUI : MonoBehaviour
 
         bool isLastLevel = SelectedLevel.Current != null && SelectedLevel.Current.levelNumber == 5;
         if (titleText != null)
-            titleText.text = isLastLevel ? "VITTORIA!" : "LIVELLO COMPLETATO!";
+            titleText.text = isLastLevel ? "VICTORY!" : "LEVEL COMPLETE!";
         if (endlessButton != null)
             endlessButton.SetActive(isLastLevel);
 

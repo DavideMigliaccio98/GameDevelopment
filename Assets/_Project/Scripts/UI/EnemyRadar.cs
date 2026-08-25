@@ -67,11 +67,16 @@ public class EnemyRadar : MonoBehaviour
     {
         // Solo nelle scene di gioco: il LevelManager e' quello che le distingue
         // dagli interni e dai menu.
-        if (FindAnyObjectByType<LevelManager>() == null) return;
+        LevelManager manager = FindAnyObjectByType<LevelManager>();
+        if (manager == null) return;
         if (FindAnyObjectByType<EnemyRadar>() != null) return;
 
-        Canvas canvas = FindAnyObjectByType<Canvas>();
-        if (canvas == null) return;
+        Canvas canvas = FindGameCanvas(manager.gameObject.scene);
+        if (canvas == null)
+        {
+            Debug.LogWarning("[EnemyRadar] Nessun canvas di gioco in questa scena: radar non creato.");
+            return;
+        }
 
         Transform root = canvas.transform.Find("SafeArea");
         if (root == null) root = canvas.transform;
@@ -79,6 +84,47 @@ public class EnemyRadar : MonoBehaviour
         var go = new GameObject("EnemyRadar", typeof(RectTransform));
         go.transform.SetParent(root, false);
         go.AddComponent<EnemyRadar>();
+    }
+
+    /// <summary>
+    /// Il canvas della scena di gioco, e nessun altro.
+    ///
+    /// Prima qui c'era FindAnyObjectByType&lt;Canvas&gt;(), che restituisce IL PRIMO
+    /// canvas che capita. Dal momento in cui il giocatore incassa un colpo esiste
+    /// anche il canvas di DamageFeedback, che sta su un oggetto marcato
+    /// DontDestroyOnLoad per sopravvivere ai cambi scena. Quando la ricerca
+    /// pescava quello, il radar veniva agganciato a un oggetto che non muore mai:
+    /// da quel momento restava a schermo per sempre, menu principale compreso,
+    /// coi puntini congelati all'ultima posizione vista.
+    ///
+    /// Spiega anche perche' capitava solo ogni tanto e solo a partita avanzata:
+    /// serviva aver preso almeno un colpo, e l'ordine in cui la ricerca trova gli
+    /// oggetti non e' garantito. E perche' nel menu il radar si vedeva piu'
+    /// piccolo: quel canvas non ha il Canvas Scaler, quindi le misure restavano
+    /// in pixel veri invece di essere scalate sui 1080 di riferimento.
+    ///
+    /// Il confronto sulla scena e' quello che risolve: gli oggetti che
+    /// sopravvivono ai cambi scena vivono in una scena a parte, quindi non
+    /// possono piu' essere scelti per sbaglio.
+    /// </summary>
+    private static Canvas FindGameCanvas(Scene gameScene)
+    {
+        Canvas fallback = null;
+
+        foreach (var c in FindObjectsByType<Canvas>(FindObjectsInactive.Include,
+                                                    FindObjectsSortMode.None))
+        {
+            if (c == null) continue;
+            if (c.gameObject.scene != gameScene) continue;   // niente DontDestroyOnLoad
+            if (c.transform.parent != null) continue;        // solo il canvas radice
+
+            // Il canvas di gioco e' quello con lo scaler: e' cio' che rende le
+            // misure indipendenti dalla risoluzione del telefono.
+            if (c.GetComponent<UnityEngine.UI.CanvasScaler>() != null) return c;
+            if (fallback == null) fallback = c;
+        }
+
+        return fallback;
     }
 
     // ------------------------------------------------------------------
@@ -236,6 +282,14 @@ public class EnemyRadar : MonoBehaviour
 
     private void LateUpdate()
     {
+        // Rete di sicurezza: se ci si ritrova fuori da una scena di gioco, il
+        // radar non ha piu' motivo di esistere e si toglie di mezzo da solo.
+        if (LevelManager.Instance == null)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         if (player == null)
         {
             var p = GameObject.FindGameObjectWithTag("Player");

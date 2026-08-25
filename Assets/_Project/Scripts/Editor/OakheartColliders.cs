@@ -166,6 +166,68 @@ public static class OakheartColliders
     }
 
     // ------------------------------------------------------------------
+    // Tilemap di ostacoli senza collider.
+    //
+    // In Game_Lava le tilemap "Decorations" e "Rock" erano solo disegno: sopra
+    // gli alberi e le rocce ci si camminava. I tile hanno gia' il tipo di
+    // collider impostato su Sprite, quindi mancava soltanto il componente
+    // TilemapCollider2D sull'oggetto.
+    //
+    // Il comando e' generico e idempotente: guarda le tilemap con un nome da
+    // ostacolo e aggiunge il collider solo a chi non ce l'ha. Nelle altre scene
+    // "Vegetation" ce l'ha gia' e viene saltata.
+    // ------------------------------------------------------------------
+    //
+    // NOTA: "Rock" e' escluso apposta. In Game_Lava quella tilemap non e' un
+    // ostacolo, e' il TERRENO su cui si cammina: le isole di roccia in mezzo
+    // alla lava. Renderla solida rende il livello impraticabile. Il nome trae
+    // in inganno, ed e' esattamente il motivo per cui questa lista deve restare
+    // corta e verificata a mano invece di indovinare dai nomi.
+    private static readonly string[] ObstacleTilemaps =
+    {
+        "Decorations", "Vegetation", "Obstacles", "Trees", "Walls"
+    };
+
+    [MenuItem("Tools/Oakheart/Collisioni/Tilemap di ostacoli")]
+    public static void TilemapObstacles()
+    {
+        var added = new List<string>();
+        int already = 0;
+
+        foreach (var map in Object.FindObjectsByType<UnityEngine.Tilemaps.Tilemap>(
+                     FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            string n = map.gameObject.name;
+            bool match = false;
+            foreach (var candidate in ObstacleTilemaps)
+                if (string.Equals(n, candidate, System.StringComparison.OrdinalIgnoreCase))
+                { match = true; break; }
+            if (!match) continue;
+
+            if (map.GetComponent<UnityEngine.Tilemaps.TilemapCollider2D>() != null)
+            { already++; continue; }
+
+            Undo.RegisterFullObjectHierarchyUndo(map.gameObject, "Collider tilemap");
+            Undo.AddComponent<UnityEngine.Tilemaps.TilemapCollider2D>(map.gameObject);
+            added.Add(n);
+        }
+
+        if (added.Count == 0 && already == 0) return;
+
+        EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+        Debug.Log($"[Oakheart] Tilemap di ostacoli in {SceneManager.GetActiveScene().name}: "
+                  + $"{added.Count} collider aggiunti ({string.Join(", ", added.ToArray())}), "
+                  + $"{already} gia' a posto.");
+
+        if (!Silent && added.Count > 0)
+            EditorUtility.DisplayDialog("Oakheart",
+                added.Count + " tilemap ora fermano il passaggio: " +
+                string.Join(", ", added.ToArray()) + ".\n\n" +
+                "Se qualche dettaglio a terra ti blocca senza motivo, si esclude " +
+                "mettendo il suo tile su Collider Type = None nell'asset del tile.", "OK");
+    }
+
+    // ------------------------------------------------------------------
     // Rocce. Questo invece sta nel batch: e' idempotente, salta quelle che
     // hanno gia' un collider e non tocca nient'altro.
     // ------------------------------------------------------------------

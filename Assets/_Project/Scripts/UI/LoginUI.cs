@@ -72,13 +72,13 @@ public class LoginUI : MonoBehaviour
         string pass = passwordInput.text;
         if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(pass))
         {
-            SetStatus("Inserisci email e password.", true);
+            SetStatus("Enter your email and password.", true);
             return;
         }
 
         isRegistering = false;
         SetButtons(false);
-        SetStatus("Login in corso...", false);
+        SetStatus("Signing in...", false);
         PlayFabAuth.LoginWithEmail(email, pass);
     }
 
@@ -100,7 +100,7 @@ public class LoginUI : MonoBehaviour
 
         if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(pass) || string.IsNullOrEmpty(user))
         {
-            SetStatus("Compila email, password e nome utente.", true);
+            SetStatus("Fill in email, password and username.", true);
             return;
         }
 
@@ -113,7 +113,7 @@ public class LoginUI : MonoBehaviour
 
         isRegistering = true; // segnala che stiamo registrando
         SetButtons(false);
-        SetStatus("Registrazione in corso...", false);
+        SetStatus("Creating account...", false);
         PlayFabAuth.Register(email, pass, user);
     }
 
@@ -123,21 +123,21 @@ public class LoginUI : MonoBehaviour
     private static string FirstProblem(string email, string pass, string user)
     {
         if (!LooksLikeEmail(email))
-            return "Indirizzo email non valido.";
+            return "Invalid email address.";
 
         if (user.Length < PlayFabAuth.UsernameMinLength || user.Length > PlayFabAuth.UsernameMaxLength)
-            return $"Nome utente: da {PlayFabAuth.UsernameMinLength} a "
-                   + $"{PlayFabAuth.UsernameMaxLength} caratteri.";
+            return $"Username: {PlayFabAuth.UsernameMinLength} to "
+                   + $"{PlayFabAuth.UsernameMaxLength} characters.";
 
         foreach (char c in user)
         {
             if (!char.IsLetterOrDigit(c))
-                return "Nome utente: solo lettere e numeri, senza spazi ne' simboli.";
+                return "Username: letters and numbers only, no spaces or symbols.";
         }
 
         if (pass.Length < PlayFabAuth.PasswordMinLength || pass.Length > PlayFabAuth.PasswordMaxLength)
-            return $"Password: da {PlayFabAuth.PasswordMinLength} a "
-                   + $"{PlayFabAuth.PasswordMaxLength} caratteri.";
+            return $"Password: {PlayFabAuth.PasswordMinLength} to "
+                   + $"{PlayFabAuth.PasswordMaxLength} characters.";
 
         return null;
     }
@@ -147,7 +147,7 @@ public class LoginUI : MonoBehaviour
     {
         isRegistering = false;
         SetButtons(false);
-        SetStatus("Login ospite...", false);
+        SetStatus("Signing in as guest...", false);
         PlayFabAuth.LoginAsGuest();
     }
 
@@ -168,7 +168,7 @@ public class LoginUI : MonoBehaviour
         string email = emailInput != null ? emailInput.text.Trim() : "";
         if (string.IsNullOrEmpty(email))
         {
-            SetStatus("Scrivi la tua email qui sopra, poi premi di nuovo.", true);
+            SetStatus("Type your email above, then press again.", true);
             return;
         }
 
@@ -176,12 +176,12 @@ public class LoginUI : MonoBehaviour
         // chiocciola o senza punto e' sbagliato e basta.
         if (!LooksLikeEmail(email))
         {
-            SetStatus("Indirizzo email non valido.", true);
+            SetStatus("Invalid email address.", true);
             return;
         }
 
         SetButtons(false);
-        SetStatus("Invio email di recupero...", false);
+        SetStatus("Sending recovery email...", false);
 
         PlayFabAuth.SendPasswordReset(email, (ok, code, message) =>
         {
@@ -189,17 +189,17 @@ public class LoginUI : MonoBehaviour
 
             if (ok)
             {
-                SetStatus("Riceverai un'email con le istruzioni.", false);
+                SetStatus("You will receive an email with instructions.", false);
                 return;
             }
 
             if (IsUnknownAccount(code))
             {
-                SetStatus("Indirizzo email non valido.", true);
+                SetStatus("Invalid email address.", true);
                 return;
             }
 
-            SetStatus("Invio non riuscito: " + message, true);
+            SetStatus("Could not send: " + message, true);
         });
     }
 
@@ -242,7 +242,7 @@ public class LoginUI : MonoBehaviour
             ShowLogin();
             // precompila l'email nel login
             if (emailInput != null) emailInput.text = regEmailInput.text.Trim();
-            SetStatus("Registrazione completata! Ora accedi.", false);
+            SetStatus("Account created. Now sign in.", false);
         }
         else
         {

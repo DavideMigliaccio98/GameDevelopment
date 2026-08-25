@@ -113,6 +113,7 @@ public class LevelManager : MonoBehaviour
 
         ResolveSpawnArea();
         ResolveEnemyBodyOffset();
+        BuildNavigation();
         Debug.Log($"[LevelManager] Caricato {levelData.levelName}");
         StartCoroutine(RunLevel());
     }
@@ -229,6 +230,28 @@ public class LevelManager : MonoBehaviour
     // ------------------------------------------------------------------
     // Posizionamento
     // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Prepara la mappa di navigazione dei nemici.
+    ///
+    /// Copre l'area giocabile INTERA, non quella di comparsa: il margine serve a
+    /// non far comparire nessuno incollato al muro, ma camminarci accanto e'
+    /// lecito, e togliere quella fascia dalla mappa vorrebbe dire che un nemico
+    /// finito li' non sa piu' dove andare.
+    /// </summary>
+    private void BuildNavigation()
+    {
+        if (!hasArea)
+        {
+            Debug.LogWarning("[LevelManager] Area non delimitata: i nemici useranno "
+                             + "solo l'aggiramento locale, senza mappa di navigazione.");
+            return;
+        }
+
+        Bounds nav = spawnArea;
+        nav.Expand(2f * areaMargin);
+        EnemyFlowField.Create(nav);
+    }
 
     /// <summary>
     /// Dove sta il collider del nemico rispetto alla sua origine, letto dal prefab.

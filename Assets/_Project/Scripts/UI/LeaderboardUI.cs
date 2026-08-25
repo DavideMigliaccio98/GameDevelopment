@@ -39,14 +39,14 @@ public void Hide()
         if (statusText != null)
         {
             statusText.gameObject.SetActive(true);
-            statusText.text = "Caricamento...";
+            statusText.text = "Loading...";
         }
 
         PlayFabLeaderboard.GetTop(maxEntries, entries =>
         {
             if (entries == null || entries.Count == 0)
             {
-                if (statusText != null) statusText.text = "Nessun punteggio ancora.";
+                if (statusText != null) statusText.text = "No scores yet.";
                 return;
             }
 

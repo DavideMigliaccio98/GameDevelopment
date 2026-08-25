@@ -48,12 +48,16 @@ public static class OakheartBatch
             "  - battute NPC aggiornate negli interni\n" +
             "  - alone del potenziamento sul Player\n" +
             "  - collider alla base delle rocce\n" +
-            "  - ordinamento per profondita' (asse Y, pivot)\n\n" +
+            "  - collider alle tilemap di ostacoli\n" +
+            "  - ordinamento per profondita' (asse Y, pivot)\n" +
+            "  - portata dell'attacco del giocatore\n\n" +
+            "Tutte le scene: scritte dei menu in inglese.\n\n" +
             "Prefab Enemy: hitbox riportata ai piedi (era sopra la testa).\n\n" +
             "MainMenu, Login e Boot (" + ScalerOnlyScenes.Length + "):\n" +
             "  - Canvas Scaler\n" +
             "  - rimozione del bottone di debug " + DevButtonName + "\n" +
             "  - skin di menu, selezione livelli, classifica e login\n" +
+            "  - voce ENDLESS in fondo alla selezione livelli\n" +
             "  - fondale in duotone al posto del teal\n\n" +
             "Fai un commit prima, se vuoi poter tornare indietro.",
             "Procedi", "Annulla");
@@ -78,6 +82,9 @@ public static class OakheartBatch
         OakheartBoostAura.Silent = true;
         OakheartColliders.Silent = true;
         OakheartDepth.Silent = true;
+        OakheartGameplay.Silent = true;
+        OakheartLanguage.Silent = true;
+        OakheartEndless.Silent = true;
 
         try
         {
@@ -107,6 +114,9 @@ public static class OakheartBatch
             OakheartBoostAura.Silent = false;
             OakheartColliders.Silent = false;
             OakheartDepth.Silent = false;
+            OakheartGameplay.Silent = false;
+            OakheartLanguage.Silent = false;
+            OakheartEndless.Silent = false;
             EditorUtility.ClearProgressBar();
 
             if (!string.IsNullOrEmpty(original))
@@ -144,6 +154,17 @@ public static class OakheartBatch
 
             if (SetScaler(canvas)) notes.Add("scaler");
 
+            // Le scritte dei menu stanno nelle scene, non negli script: vale
+            // per tutte, sia quelle di gioco sia quelle di contorno.
+            OakheartLanguage.ApplyActive();
+            notes.Add("lingua");
+
+            // Valori salvati nelle scene, che vincono su quelli scritti negli
+            // script. Vale per tutte: la portata dell'attacco sta nelle scene di
+            // gioco, lo stacco del titolo sta in MainMenu.
+            OakheartGameplay.ApplyActive();
+            notes.Add("valori");
+
             if (full)
             {
                 int moved = EnsureSafeArea(canvas);
@@ -165,6 +186,11 @@ public static class OakheartBatch
                 OakheartColliders.DecorationColliders();
                 notes.Add("rocce");
 
+                // Tilemap di ostacoli senza collider: in Game_Lava si camminava
+                // sopra gli alberi.
+                OakheartColliders.TilemapObstacles();
+                notes.Add("tilemap");
+
                 // Ordine di disegno per profondita': senza, chi finisce davanti
                 // e chi dietro lo decideva il caso.
                 OakheartDepth.ApplyActive();
@@ -175,6 +201,10 @@ public static class OakheartBatch
                 if (RemoveDevButton(canvas)) notes.Add("rimosso " + DevButtonName);
                 OakheartMenuSkin.ApplyActive();
                 notes.Add("menu");
+
+                // La sesta voce dell'elenco livelli, copiata dalla quinta.
+                OakheartEndless.ApplyActive();
+                notes.Add("endless");
             }
 
             EditorSceneManager.MarkSceneDirty(scene);

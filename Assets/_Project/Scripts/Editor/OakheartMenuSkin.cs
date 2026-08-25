@@ -85,7 +85,7 @@ public static class OakheartMenuSkin
         string scene = SceneManager.GetActiveScene().name;
         int done = 0;
 
-        if (root.Find("PlayButton") != null)           { SkinMainMenu(root, kit); done++; }
+        if (root.Find("PlayButton") != null)           { SkinMainMenu(root, kit); SkinProfile(root, kit); done++; }
         if (root.Find("LevelSelectionPanel") != null)  { SkinLevelSelection(root, kit); done++; }
         if (root.Find("LeaderboardPanel") != null)     { SkinLeaderboard(root, kit); done++; }
         if (root.Find("LoginPanel") != null)           { SkinLogin(root, kit); done++; }
@@ -334,6 +334,274 @@ public static class OakheartMenuSkin
         }
 
         RebuildBox(box);
+    }
+
+    // ================================================================ profilo
+    /// <summary>
+    /// Costruisce e veste la schermata del profilo.
+    ///
+    /// A differenza delle altre, questa schermata non esisteva: viene creata da
+    /// zero al primo lancio e poi soltanto rivestita. Riusa gli stessi pezzi
+    /// delle altre — riquadro, targhetta, bottoni, campo di testo — quindi non
+    /// c'e' niente da tenere allineato a mano: se un domani cambia la skin,
+    /// cambia anche questa.
+    ///
+    /// Il bottone che la apre e' una copia di quello della classifica, infilato
+    /// tra classifica e uscita.
+    /// </summary>
+    private static void SkinProfile(Transform root, Kit k)
+    {
+        Transform panel = root.Find("ProfilePanel");
+        if (panel == null) panel = NewRect("ProfilePanel", root);
+        Stretch(panel);
+
+        Transform bg = FindDeep(panel, "BackgroundImage_Profile");
+        if (bg == null) { bg = NewImage("BackgroundImage_Profile", panel); bg.SetSiblingIndex(0); }
+        SetBackground(bg, k);
+
+        Transform overlay = FindDeep(panel, "PRDarkOverlay");
+        if (overlay == null) { overlay = NewImage("PRDarkOverlay", panel); overlay.SetSiblingIndex(1); }
+        FixOverlay(overlay, PanelOverlay);
+
+        Transform box = EnsureBox(panel, "PRBox", k, 880f, new RectOffset(50, 50, 90, 50), 20f);
+
+        Transform title = FindDeep(panel, "PRTitle");
+        if (title == null)
+        {
+            var go = new GameObject("PRTitle", typeof(RectTransform));
+            Undo.RegisterCreatedObjectUndo(go, "PRTitle");
+            go.transform.SetParent(box, false);
+            go.AddComponent<TextMeshProUGUI>().text = "PROFILE";
+            title = go.transform;
+        }
+        AttachPlate(box, "PRPlate", title, k, 620f, FontPlateBig);
+
+        Transform input = EnsureInput(panel, "PRNameInput", "Display name");
+        SkinInput(input, box, k, 0);
+
+        Transform save = EnsureButton(panel, "PRSaveName", "SAVE NAME");
+        SkinBoxButton(save, box, k, true, 1, 660f, 110f);
+
+        // Il bottone dice quello che l'utente VUOLE fare; a spiegare come
+        // avviene ci pensa il messaggio che compare dopo averlo premuto.
+        // Cambiare la password davvero dentro l'app con PlayFab non si puo':
+        // vedi il commento in ProfileUI.OnChangePassword.
+        Transform password = EnsureButton(panel, "PRPassword", "CHANGE PASSWORD");
+        SkinBoxButton(password, box, k, false, 2, 660f, 110f);
+
+        Transform stats = EnsureLabel(panel, "PRStats", "Best score: 0");
+        MoveIntoBox(stats, box, 660f, 170f, 3);
+        Style(stats.GetComponent<TextMeshProUGUI>(), k.Font, FontRow, DarkWood, TextAlignmentOptions.Center);
+
+        Transform status = EnsureLabel(panel, "PRStatusText", "");
+        MoveIntoBox(status, box, 660f, 50f, 4);
+        Style(status.GetComponent<TextMeshProUGUI>(), k.Font, FontStatus, DarkWood, TextAlignmentOptions.Center);
+
+        Transform close = EnsureButton(panel, "PRCloseButton", "BACK");
+        SkinBoxButton(close, box, k, false, 5, 420f, 100f);
+
+        WireProfile(panel, input, save, password, stats, status, close);
+        EnsureProfileButton(root, k);
+
+        RebuildBox(box);
+        panel.gameObject.SetActive(false);   // si apre dal menu, non all'avvio
+    }
+
+    /// <summary>
+    /// Riempie i campi dello script ProfileUI, cosi non vanno trascinati a mano.
+    /// </summary>
+    private static void WireProfile(Transform panel, Transform input, Transform save,
+                                    Transform password, Transform stats,
+                                    Transform status, Transform close)
+    {
+        var ui = Comp<ProfileUI>(panel.gameObject);
+        var so = new SerializedObject(ui);
+
+        SetRef(so, "nameInput", input.GetComponent<TMP_InputField>());
+        SetRef(so, "saveNameButton", save.GetComponent<Button>());
+        SetRef(so, "passwordButton", password.GetComponent<Button>());
+        SetRef(so, "statsText", stats.GetComponent<TextMeshProUGUI>());
+        SetRef(so, "statusText", status.GetComponent<TextMeshProUGUI>());
+        SetRef(so, "closeButton", close.GetComponent<Button>());
+
+        so.ApplyModifiedProperties();
+        EditorUtility.SetDirty(ui);
+    }
+
+    private static void SetRef(SerializedObject so, string field, UnityEngine.Object value)
+    {
+        SerializedProperty p = so.FindProperty(field);
+        if (p != null) p.objectReferenceValue = value;
+    }
+
+    /// <summary>
+    /// Il bottone PROFILE nel menu principale, tra classifica e uscita.
+    /// </summary>
+    private static void EnsureProfileButton(Transform root, Kit k)
+    {
+        Transform existing = root.Find("ProfileButton");
+        Transform reference = root.Find("LeaderboardButton");
+        if (reference == null) return;
+
+        if (existing == null)
+        {
+            var copy = Object.Instantiate(reference.gameObject, reference.parent);
+            copy.name = "ProfileButton";
+            Undo.RegisterCreatedObjectUndo(copy, "ProfileButton");
+            existing = copy.transform;
+
+            // Una copia si porta dietro anche i collegamenti dell'originale:
+            // qui aprirebbe la classifica invece del profilo.
+            var btn = copy.GetComponent<Button>();
+            if (btn != null)
+            {
+                var so = new SerializedObject(btn);
+                SerializedProperty calls = so.FindProperty("m_OnClick.m_PersistentCalls.m_Calls");
+                if (calls != null) { calls.ClearArray(); so.ApplyModifiedProperties(); }
+            }
+        }
+
+        // Prima in fondo e poi al posto giusto: cosi l'indice del bottone di
+        // riferimento e' gia' quello definitivo quando lo si legge.
+        existing.SetAsLastSibling();
+        existing.SetSiblingIndex(reference.GetSiblingIndex() + 1);
+
+        var label = existing.GetComponentInChildren<TMP_Text>(true);
+        if (label != null) label.text = "PROFILE";
+
+        SkinMenuButton(existing, k, false, FontPlateBig, 560f, 130f);
+        StackMenuButtons(root, existing);
+        WireOpenProfile(root, existing);
+    }
+
+    /// <summary>
+    /// Collega il bottone PROFILE a MainMenuUI.OnProfile.
+    ///
+    /// Il collegamento va scritto nella scena, non aggiunto a runtime dal
+    /// pannello: il pannello nasce spento e non esegue niente finche' non lo si
+    /// accende, quindi non puo' agganciare da solo il bottone che serve ad
+    /// accenderlo. Era il motivo per cui il bottone non faceva nulla.
+    /// </summary>
+    private static void WireOpenProfile(Transform root, Transform button)
+    {
+        var btn = button.GetComponent<Button>();
+        if (btn == null) return;
+
+        var menu = Object.FindAnyObjectByType<MainMenuUI>(FindObjectsInactive.Include);
+        if (menu == null)
+        {
+            Debug.LogWarning("[Oakheart] Nessun MainMenuUI: il bottone PROFILE resta scollegato.");
+            return;
+        }
+
+        // Si azzera prima, cosi rilanciare il comando non accumula chiamate.
+        for (int i = btn.onClick.GetPersistentEventCount() - 1; i >= 0; i--)
+            UnityEventTools.RemovePersistentListener(btn.onClick, i);
+
+        UnityEventTools.AddPersistentListener(btn.onClick, new UnityAction(menu.OnProfile));
+        EditorUtility.SetDirty(btn);
+    }
+
+    /// <summary>
+    /// Rimette in colonna i bottoni del menu dopo l'aggiunta del profilo.
+    ///
+    /// I tre bottoni originali hanno posizioni fisse, non un contenitore che li
+    /// dispone: infilarne un quarto senza toccare le quote lo farebbe comparire
+    /// esattamente sopra la classifica. Il passo tra un bottone e l'altro non e'
+    /// scritto qui, si ricava dai due che ci sono gia': cosi se un domani cambi
+    /// la spaziatura, il profilo la segue invece di sballarla.
+    ///
+    /// GIOCA e CLASSIFICA restano dove sono; PROFILO prende il posto sotto e
+    /// LOGOUT scende di uno.
+    /// </summary>
+    private static void StackMenuButtons(Transform root, Transform profile)
+    {
+        RectTransform play = root.Find("PlayButton") as RectTransform;
+        RectTransform board = root.Find("LeaderboardButton") as RectTransform;
+        RectTransform quit = root.Find("QuitButton") as RectTransform;
+        RectTransform prof = profile as RectTransform;
+        if (play == null || board == null || quit == null || prof == null) return;
+
+        float step = play.anchoredPosition.y - board.anchoredPosition.y;
+        if (step <= 0f) step = 200f;   // quote inattese: si ripiega sul passo storico
+
+        Undo.RecordObject(prof, "Colonna dei bottoni");
+        Undo.RecordObject(quit, "Colonna dei bottoni");
+
+        prof.anchorMin = board.anchorMin;
+        prof.anchorMax = board.anchorMax;
+        prof.pivot = board.pivot;
+        prof.anchoredPosition = new Vector2(board.anchoredPosition.x,
+                                            board.anchoredPosition.y - step);
+
+        quit.anchoredPosition = new Vector2(quit.anchoredPosition.x,
+                                            prof.anchoredPosition.y - step);
+
+        EditorUtility.SetDirty(prof);
+        EditorUtility.SetDirty(quit);
+    }
+
+    // ---------------------------------------------------------------- pezzi
+
+    private static Transform EnsureButton(Transform parent, string name, string label)
+    {
+        Transform t = FindDeep(parent, name);
+        if (t == null) t = NewButton(name, parent, label);
+
+        var tmp = t.GetComponentInChildren<TMP_Text>(true);
+        if (tmp != null) tmp.text = label;
+        return t;
+    }
+
+    private static Transform EnsureLabel(Transform parent, string name, string text)
+    {
+        Transform t = FindDeep(parent, name);
+        if (t != null) return t;
+
+        var go = new GameObject(name, typeof(RectTransform));
+        Undo.RegisterCreatedObjectUndo(go, name);
+        go.transform.SetParent(parent, false);
+        go.AddComponent<TextMeshProUGUI>().text = text;
+        return go.transform;
+    }
+
+    /// <summary>
+    /// Un campo di testo completo: sfondo, area ritagliata, testo e segnaposto.
+    /// TMP_InputField non funziona senza tutte e tre le parti collegate.
+    /// </summary>
+    private static Transform EnsureInput(Transform parent, string name, string placeholder)
+    {
+        Transform existing = FindDeep(parent, name);
+        if (existing != null) return existing;
+
+        var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        Undo.RegisterCreatedObjectUndo(go, name);
+        go.transform.SetParent(parent, false);
+
+        var area = new GameObject("Text Area", typeof(RectTransform), typeof(RectMask2D));
+        area.transform.SetParent(go.transform, false);
+        Stretch(area.transform);
+
+        var phGo = new GameObject("Placeholder", typeof(RectTransform));
+        phGo.transform.SetParent(area.transform, false);
+        var ph = phGo.AddComponent<TextMeshProUGUI>();
+        ph.text = placeholder;
+        Stretch(phGo.transform);
+
+        var txtGo = new GameObject("Text", typeof(RectTransform));
+        txtGo.transform.SetParent(area.transform, false);
+        var txt = txtGo.AddComponent<TextMeshProUGUI>();
+        txt.text = "";
+        Stretch(txtGo.transform);
+
+        var field = go.AddComponent<TMP_InputField>();
+        field.textViewport = area.GetComponent<RectTransform>();
+        field.textComponent = txt;
+        field.placeholder = ph;
+        field.lineType = TMP_InputField.LineType.SingleLine;
+        field.characterLimit = 25;
+
+        return go.transform;
     }
 
     // ================================================================ classifica

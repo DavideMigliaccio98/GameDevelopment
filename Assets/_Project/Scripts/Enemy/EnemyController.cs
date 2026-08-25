@@ -145,8 +145,20 @@ public class EnemyController : MonoBehaviour
         }
         else
         {
-            move = SteerAround(pos, toPlayer);
-            CheckIfStuck(pos, toPlayer);
+            // La direzione di base la da' la mappa di navigazione quando la via
+            // diretta e' chiusa: e' l'unica che sa girare attorno a un ostacolo
+            // grande. Le antenne restano sopra, per gli aggiustamenti a corto
+            // raggio e per non incastrarsi tra compagni.
+            Vector2 desired = toPlayer;
+            if (Blocked(pos, toPlayer) && EnemyFlowField.Instance != null)
+            {
+                Vector2 fromField;
+                if (EnemyFlowField.Instance.TryGetDirection(pos, out fromField))
+                    desired = fromField;
+            }
+
+            move = SteerAround(pos, desired);
+            CheckIfStuck(pos, desired);
         }
 
         rb.linearVelocity = move * speed;
@@ -167,7 +179,19 @@ public class EnemyController : MonoBehaviour
             Vector2 dir = Rotate(desired, ProbeAngles[i]);
             if (!Blocked(origin, dir)) return dir;
         }
-        return desired;   // circondato: spinge comunque, ci pensera' il detour
+
+        // Circondato da tutte le parti nel ventaglio. Invece di spingere contro
+        // il muro si prova a tornare indietro lungo la mappa di navigazione, che
+        // e' l'unica cosa capace di dire "esci dalla rientranza".
+        if (EnemyFlowField.Instance != null)
+        {
+            Vector2 escape;
+            if (EnemyFlowField.Instance.TryGetDirection(origin, out escape)
+                && !Blocked(origin, escape))
+                return escape;
+        }
+
+        return desired;   // niente da fare: spinge comunque, ci pensera' il detour
     }
 
     private bool Blocked(Vector2 origin, Vector2 dir)

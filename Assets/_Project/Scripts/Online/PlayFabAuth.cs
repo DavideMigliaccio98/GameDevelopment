@@ -99,6 +99,35 @@ public static class PlayFabAuth
             OnError);
     }
 
+    // ----------- NOME VISUALIZZATO -----------
+    /// <summary>
+    /// Cambia il nome che compare in classifica.
+    ///
+    /// E' il DisplayName del titolo, non lo Username con cui si accede: quello
+    /// resta com'e'. Cambiarlo non tocca le credenziali, quindi non serve
+    /// rifare l'accesso.
+    ///
+    /// PlayFab accetta da 3 a 25 caratteri e rifiuta i nomi gia' presi da altri
+    /// giocatori dello stesso titolo.
+    /// </summary>
+    public static void UpdateDisplayName(string newName, Action<bool, string> onDone)
+    {
+        var request = new UpdateUserTitleDisplayNameRequest { DisplayName = newName };
+
+        PlayFabClientAPI.UpdateUserTitleDisplayName(request,
+            r =>
+            {
+                DisplayName = r.DisplayName;
+                Debug.Log($"[PlayFab] Nome visualizzato aggiornato: {DisplayName}");
+                onDone?.Invoke(true, "");
+            },
+            e =>
+            {
+                Debug.LogWarning($"[PlayFab] Cambio nome fallito: {e.GenerateErrorReport()}");
+                onDone?.Invoke(false, Describe(e));
+            });
+    }
+
     // ----------- RECUPERO PASSWORD -----------
     /// <summary>
     /// Chiede a PlayFab di mandare l'email di reimpostazione password.
@@ -145,47 +174,47 @@ public static class PlayFabAuth
     /// </summary>
     public static string Describe(PlayFabError error)
     {
-        if (error == null) return "Errore sconosciuto.";
+        if (error == null) return "Unknown error.";
 
         switch (error.Error)
         {
             case PlayFabErrorCode.EmailAddressNotAvailable:
-                return "Questa email e' gia' registrata. Prova ad accedere.";
+                return "This email is already registered. Try signing in.";
 
             case PlayFabErrorCode.UsernameNotAvailable:
-                return "Questo nome utente e' gia' preso. Scegline un altro.";
+                return "That username is already taken. Choose another one.";
 
             case PlayFabErrorCode.InvalidEmailAddress:
-                return "Indirizzo email non valido.";
+                return "Invalid email address.";
 
             case PlayFabErrorCode.InvalidUsername:
-                return $"Nome utente non valido: da {UsernameMinLength} a {UsernameMaxLength} "
-                       + "caratteri, solo lettere e numeri.";
+                return $"Invalid username: {UsernameMinLength} to {UsernameMaxLength} characters, "
+                       + "letters and numbers only.";
 
             case PlayFabErrorCode.InvalidPassword:
-                return $"Password non valida: da {PasswordMinLength} a {PasswordMaxLength} caratteri.";
+                return $"Invalid password: {PasswordMinLength} to {PasswordMaxLength} characters.";
 
             case PlayFabErrorCode.InvalidEmailOrPassword:
             case PlayFabErrorCode.InvalidUsernameOrPassword:
             case PlayFabErrorCode.AccountNotFound:
-                return "Email o password non corretti.";
+                return "Wrong email or password.";
 
             case PlayFabErrorCode.AccountBanned:
-                return "Questo account e' stato bloccato.";
+                return "This account has been banned.";
 
             case PlayFabErrorCode.ConnectionError:
-                return "Nessuna connessione. Controlla la rete e riprova.";
+                return "No connection. Check your network and try again.";
 
             case PlayFabErrorCode.ServiceUnavailable:
             case PlayFabErrorCode.InternalServerError:
-                return "Servizio non raggiungibile. Riprova tra poco.";
+                return "Service unavailable. Try again shortly.";
         }
 
         // InvalidParams e simili: il codice non basta, ma i campi ci sono
         string detailed = FromDetails(error);
         if (!string.IsNullOrEmpty(detailed)) return detailed;
 
-        return string.IsNullOrEmpty(error.ErrorMessage) ? "Operazione non riuscita." : error.ErrorMessage;
+        return string.IsNullOrEmpty(error.ErrorMessage) ? "Something went wrong." : error.ErrorMessage;
     }
 
     /// <summary>
@@ -222,18 +251,18 @@ public static class PlayFabAuth
         switch (field)
         {
             case "Email":
-                return "Indirizzo email non valido.";
+                return "Invalid email address.";
             case "Password":
-                return $"Password: da {PasswordMinLength} a {PasswordMaxLength} caratteri.";
+                return $"Password: {PasswordMinLength} to {PasswordMaxLength} characters.";
             case "Username":
-                return $"Nome utente: da {UsernameMinLength} a {UsernameMaxLength} caratteri, "
-                       + "solo lettere e numeri, senza spazi.";
+                return $"Username: {UsernameMinLength} to {UsernameMaxLength} characters, "
+                       + "letters and numbers only, no spaces.";
             case "DisplayName":
-                return "Nome visualizzato non valido: da 3 a 25 caratteri.";
+                return "Invalid display name: 3 to 25 characters.";
             case "TitleId":
-                return "Configurazione del gioco non valida.";
+                return "Invalid game configuration.";
         }
-        return field + ": valore non valido.";
+        return field + ": invalid value.";
     }
 
     // ----------- CONTACT EMAIL (per verifica) -----------

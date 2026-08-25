@@ -38,6 +38,20 @@ public class MainMenuUI : MonoBehaviour
         if (ls != null) ls.Show();
     }
 
+   /// <summary>
+    /// Apre la schermata del profilo.
+    ///
+    /// Sta qui e non sul pannello perche' questo script vive su un oggetto
+    /// sempre acceso: il pannello nasce spento, e chi e' spento non puo'
+    /// agganciare da solo il bottone che dovrebbe accenderlo.
+    /// </summary>
+    public void OnProfile()
+    {
+        var profile = FindAnyObjectByType<ProfileUI>(FindObjectsInactive.Include);
+        if (profile != null) profile.Show();
+        else Debug.LogWarning("[MainMenu] Nessuna schermata profilo in questa scena.");
+    }
+
    public void OnLeaderboard()
     {
         var lb = FindAnyObjectByType<LeaderboardUI>(FindObjectsInactive.Include);

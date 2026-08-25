@@ -2,7 +2,9 @@ using UnityEngine;
 
 public class PlayerAttack : MonoBehaviour
 {
-    [SerializeField] private float attackRange = 1.0f;
+    [Tooltip("Raggio del cerchio di attacco. Il cerchio parte 0.6 davanti al " +
+             "giocatore, quindi la portata effettiva e' circa questo valore piu' mezza unita'.")]
+    [SerializeField] private float attackRange = 0.75f;
     [SerializeField] private int damage = 25;
     [SerializeField] private float cooldown = 0.5f;
     [SerializeField] private LayerMask enemyLayer;
